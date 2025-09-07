@@ -497,7 +497,7 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
     height = mmToPoints(130);
   }
   
-  // 判断是否为小尺寸纸张
+  // 判断是否为小尺寸纸张 
   const isSmallPaper = width < mmToPoints(75) && height < mmToPoints(75);
   
   // 根据纸张大小调整边距
@@ -733,35 +733,40 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
       let imageY, imageHeight;
       
       if (isSmallPaper) {
-        // 小纸张：确保图片在下1/3区域
-        const nutritionAreaHeight = contentHeight * 0.33;
-        const nutritionStartY = height - margin - nutritionAreaHeight;
+        // 小纸张：使用动态计算的营养成分表空间
+        imageY = currentY + 3; // 文字内容结束后留3点间隔
+        imageHeight = height - margin - imageY; // 使用剩余的所有空间
         
-        // 确保文字不会进入营养成分表区域
-        if (currentY > nutritionStartY) {
-          // 文字已经进入营养区域，需要调整
-          console.log('Warning: Text overflow into nutrition area');
+        // 确保至少有最小显示空间
+        if (imageHeight > 15) {
+          // 将base64转换为buffer
+          const imageBuffer = Buffer.from(labelData.nutritionImage.split(',')[1], 'base64');
+          
+          // 对于小纸张，使用精确尺寸而不是保持宽高比，允许图片被压扁
+          // 这样可以确保营养成分表完全显示，即使会被压扁
+          doc.image(imageBuffer, margin, imageY, {
+            width: contentWidth,
+            height: imageHeight
+            // 不使用fit选项，图片会被拉伸适应尺寸
+          });
         }
-        
-        imageY = Math.max(nutritionStartY, currentY + 5); // 留5点间隔
-        imageHeight = Math.min(nutritionAreaHeight - 5, height - margin - imageY);
       } else {
-        // 大纸张：在文字下方显示
+        // 大纸张：在文字下方显示，保持宽高比
         const remainingHeight = height - margin - currentY;
         imageY = currentY + 5;
         imageHeight = Math.min(remainingHeight - 5, contentWidth * 0.8);
-      }
-      
-      if (imageHeight > 10) {
-        // 将base64转换为buffer
-        const imageBuffer = Buffer.from(labelData.nutritionImage.split(',')[1], 'base64');
-        doc.image(imageBuffer, margin, imageY, {
-          width: contentWidth,
-          height: imageHeight,
-          fit: [contentWidth, imageHeight],
-          align: 'center',
-          valign: 'center'
-        });
+        
+        if (imageHeight > 10) {
+          // 将base64转换为buffer
+          const imageBuffer = Buffer.from(labelData.nutritionImage.split(',')[1], 'base64');
+          doc.image(imageBuffer, margin, imageY, {
+            width: contentWidth,
+            height: imageHeight,
+            fit: [contentWidth, imageHeight], // 大纸张保持宽高比
+            align: 'center',
+            valign: 'center'
+          });
+        }
       }
     } catch (e) {
       console.error('Failed to add nutrition image:', e);
@@ -817,6 +822,436 @@ ipcMain.handle('preview-pdf', async (event, pdfPath) => {
   shell.openPath(pdfPath);
   return true;
 });
+</file>
+
+<file path="style.css">
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    background: #f5f5f5;
+    color: #333;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.container {
+    display: flex;
+    height: 100vh;
+}
+
+/* 左侧边栏 */
+.sidebar {
+    width: 300px;
+    background: white;
+    border-right: 1px solid #e0e0e0;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-header {
+    padding: 20px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.sidebar-header h2 {
+    margin-bottom: 15px;
+    font-size: 20px;
+}
+
+.sidebar-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.search-box {
+    padding: 15px 20px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.search-box input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.label-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+.label-item {
+    padding: 12px 15px;
+    margin-bottom: 5px;
+    background: #f8f8f8;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.label-item:hover {
+    background: #e8e8e8;
+}
+
+.label-item.active {
+    background: #007bff;
+    color: white;
+}
+
+.label-item-name {
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+
+.label-item-info {
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+/* 主内容区 */
+.main-content {
+    flex: 1;
+    display: flex;
+    background: white;
+}
+
+.welcome-view {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 40px;
+}
+
+.welcome-view h2 {
+    margin-bottom: 20px;
+    font-size: 28px;
+    color: #555;
+}
+
+.welcome-view p {
+    font-size: 16px;
+    color: #888;
+}
+
+.editor-view {
+    flex: 1;
+    display: flex;
+    height: 100vh;
+}
+
+/* 编辑面板 */
+.editor-panel {
+    flex: 1;
+    padding: 30px;
+    overflow-y: auto;
+    border-right: 1px solid #e0e0e0;
+}
+
+.editor-panel h3 {
+    margin-bottom: 20px;
+    font-size: 18px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group input[type="date"],
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.form-group textarea {
+    resize: vertical;
+}
+
+.form-group input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+.shelf-life-inputs {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.shelf-life-inputs input {
+    flex: 1;
+}
+
+.image-preview {
+    margin-top: 10px;
+    max-width: 300px;
+}
+
+.image-preview img {
+    max-width: 100%;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+/* 额外字段 */
+.extra-field {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.extra-field input {
+    flex: 1;
+}
+
+.extra-field button {
+    padding: 5px 10px;
+}
+
+/* 预览面板 */
+.preview-panel {
+    width: 400px;
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+}
+
+.preview-panel h3 {
+    margin-bottom: 20px;
+    font-size: 18px;
+}
+
+.print-settings {
+    margin-bottom: 30px;
+}
+
+#customSizeInputs {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+#customSizeInputs input {
+    flex: 1;
+}
+
+.print-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.print-actions button {
+    flex: 1;
+}
+
+.preview-area {
+    flex: 1;
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    background: #fafafa;
+    overflow: auto;
+}
+
+.preview-area h4 {
+    margin-bottom: 15px;
+    font-size: 16px;
+    text-align: center;
+}
+
+.preview-content {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+    min-height: 300px;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.preview-content p {
+    text-align: center;
+    color: #999;
+    margin-top: 100px;
+}
+
+/* 按钮样式 */
+.btn {
+    padding: 8px 16px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    color: #333;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn:hover {
+    background: #f8f8f8;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: white;
+    border-color: #dc3545;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+}
+
+.btn-small {
+    padding: 5px 10px;
+    font-size: 12px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #e0e0e0;
+}
+
+/* 输入建议列表 */
+.suggestion-list {
+    position: absolute;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+}
+
+.suggestion-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.suggestion-item:hover {
+    background: #f0f0f0;
+}
+
+.suggestion-item.selected {
+    background: #007bff;
+    color: white;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* 响应式调整 */
+@media (max-width: 1200px) {
+    .preview-panel {
+        width: 350px;
+    }
+}
+
+@media (max-width: 1000px) {
+    .sidebar {
+        width: 250px;
+    }
+}
+
+/* 小纸张预览样式 */
+.preview-content-small {
+    font-size: 10px !important;
+    line-height: 1.3 !important;
+}
+
+.preview-content-small strong {
+    font-weight: 600;
+}
+
+.preview-content-small div {
+    margin-bottom: 2px;
+}
+
+.preview-content-small span {
+    display: inline-block;
+    margin-right: 8px;
+}
+
+/* 自适应预览容器 */
+.preview-content[data-paper-size="small"] {
+    transform: scale(0.8);
+    transform-origin: top left;
+}
+
+/* 打印设置响应式调整 */
+@media print {
+    .preview-content-small {
+        font-size: 8px !important;
+        line-height: 1.2 !important;
+    }
+}
+
+/* 营养成分表图片自适应 */
+.preview-content img {
+    object-fit: contain;
+    display: block;
+    margin: 0 auto;
+}
+
+/* 确保建议列表不会阻挡输入 */
+.suggestion-list {
+    pointer-events: none;
+}
+.suggestion-list[style*="display: block"] {
+    pointer-events: auto;
+}
 </file>
 
 <file path="renderer.js">
@@ -1982,436 +2417,6 @@ function updateInputHistory(fieldId, value) {
     setTimeout(() => {
         saveInputHistory();
     }, 100);
-}
-</file>
-
-<file path="style.css">
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
-    background: #f5f5f5;
-    color: #333;
-    height: 100vh;
-    overflow: hidden;
-}
-
-.container {
-    display: flex;
-    height: 100vh;
-}
-
-/* 左侧边栏 */
-.sidebar {
-    width: 300px;
-    background: white;
-    border-right: 1px solid #e0e0e0;
-    display: flex;
-    flex-direction: column;
-}
-
-.sidebar-header {
-    padding: 20px;
-    border-bottom: 1px solid #e0e0e0;
-}
-
-.sidebar-header h2 {
-    margin-bottom: 15px;
-    font-size: 20px;
-}
-
-.sidebar-actions {
-    display: flex;
-    gap: 10px;
-}
-
-.search-box {
-    padding: 15px 20px;
-    border-bottom: 1px solid #e0e0e0;
-}
-
-.search-box input {
-    width: 100%;
-    padding: 8px 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
-}
-
-.label-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 10px;
-}
-
-.label-item {
-    padding: 12px 15px;
-    margin-bottom: 5px;
-    background: #f8f8f8;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.label-item:hover {
-    background: #e8e8e8;
-}
-
-.label-item.active {
-    background: #007bff;
-    color: white;
-}
-
-.label-item-name {
-    font-weight: 500;
-    margin-bottom: 4px;
-}
-
-.label-item-info {
-    font-size: 12px;
-    opacity: 0.7;
-}
-
-/* 主内容区 */
-.main-content {
-    flex: 1;
-    display: flex;
-    background: white;
-}
-
-.welcome-view {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-    padding: 40px;
-}
-
-.welcome-view h2 {
-    margin-bottom: 20px;
-    font-size: 28px;
-    color: #555;
-}
-
-.welcome-view p {
-    font-size: 16px;
-    color: #888;
-}
-
-.editor-view {
-    flex: 1;
-    display: flex;
-    height: 100vh;
-}
-
-/* 编辑面板 */
-.editor-panel {
-    flex: 1;
-    padding: 30px;
-    overflow-y: auto;
-    border-right: 1px solid #e0e0e0;
-}
-
-.editor-panel h3 {
-    margin-bottom: 20px;
-    font-size: 18px;
-}
-
-.form-group {
-    margin-bottom: 20px;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 5px;
-    font-weight: 500;
-    font-size: 14px;
-}
-
-.form-group input[type="text"],
-.form-group input[type="number"],
-.form-group input[type="date"],
-.form-group select,
-.form-group textarea {
-    width: 100%;
-    padding: 8px 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
-}
-
-.form-group textarea {
-    resize: vertical;
-}
-
-.form-group input[type="checkbox"] {
-    margin-right: 8px;
-}
-
-.shelf-life-inputs {
-    display: flex;
-    gap: 10px;
-    margin-top: 10px;
-}
-
-.shelf-life-inputs input {
-    flex: 1;
-}
-
-.image-preview {
-    margin-top: 10px;
-    max-width: 300px;
-}
-
-.image-preview img {
-    max-width: 100%;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-}
-
-/* 额外字段 */
-.extra-field {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 10px;
-}
-
-.extra-field input {
-    flex: 1;
-}
-
-.extra-field button {
-    padding: 5px 10px;
-}
-
-/* 预览面板 */
-.preview-panel {
-    width: 400px;
-    padding: 30px;
-    display: flex;
-    flex-direction: column;
-}
-
-.preview-panel h3 {
-    margin-bottom: 20px;
-    font-size: 18px;
-}
-
-.print-settings {
-    margin-bottom: 30px;
-}
-
-#customSizeInputs {
-    display: flex;
-    gap: 10px;
-    margin-top: 10px;
-}
-
-#customSizeInputs input {
-    flex: 1;
-}
-
-.print-actions {
-    display: flex;
-    gap: 10px;
-    margin-top: 20px;
-}
-
-.print-actions button {
-    flex: 1;
-}
-
-.preview-area {
-    flex: 1;
-    border: 2px dashed #ddd;
-    border-radius: 8px;
-    padding: 20px;
-    background: #fafafa;
-    overflow: auto;
-}
-
-.preview-area h4 {
-    margin-bottom: 15px;
-    font-size: 16px;
-    text-align: center;
-}
-
-.preview-content {
-    background: white;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    padding: 15px;
-    min-height: 300px;
-    font-size: 12px;
-    line-height: 1.6;
-}
-
-.preview-content p {
-    text-align: center;
-    color: #999;
-    margin-top: 100px;
-}
-
-/* 按钮样式 */
-.btn {
-    padding: 8px 16px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    background: white;
-    color: #333;
-    font-size: 14px;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.btn:hover {
-    background: #f8f8f8;
-}
-
-.btn-primary {
-    background: #007bff;
-    color: white;
-    border-color: #007bff;
-}
-
-.btn-primary:hover {
-    background: #0056b3;
-}
-
-.btn-danger {
-    background: #dc3545;
-    color: white;
-    border-color: #dc3545;
-}
-
-.btn-danger:hover {
-    background: #c82333;
-}
-
-.btn-small {
-    padding: 5px 10px;
-    font-size: 12px;
-}
-
-.form-actions {
-    display: flex;
-    gap: 10px;
-    margin-top: 30px;
-    padding-top: 20px;
-    border-top: 1px solid #e0e0e0;
-}
-
-/* 输入建议列表 */
-.suggestion-list {
-    position: absolute;
-    background: white;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    max-height: 200px;
-    overflow-y: auto;
-    z-index: 1000;
-}
-
-.suggestion-item {
-    padding: 8px 12px;
-    cursor: pointer;
-    font-size: 14px;
-}
-
-.suggestion-item:hover {
-    background: #f0f0f0;
-}
-
-.suggestion-item.selected {
-    background: #007bff;
-    color: white;
-}
-
-/* 滚动条样式 */
-::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-}
-
-::-webkit-scrollbar-track {
-    background: #f1f1f1;
-}
-
-::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: #555;
-}
-
-/* 响应式调整 */
-@media (max-width: 1200px) {
-    .preview-panel {
-        width: 350px;
-    }
-}
-
-@media (max-width: 1000px) {
-    .sidebar {
-        width: 250px;
-    }
-}
-
-/* 小纸张预览样式 */
-.preview-content-small {
-    font-size: 10px !important;
-    line-height: 1.3 !important;
-}
-
-.preview-content-small strong {
-    font-weight: 600;
-}
-
-.preview-content-small div {
-    margin-bottom: 2px;
-}
-
-.preview-content-small span {
-    display: inline-block;
-    margin-right: 8px;
-}
-
-/* 自适应预览容器 */
-.preview-content[data-paper-size="small"] {
-    transform: scale(0.8);
-    transform-origin: top left;
-}
-
-/* 打印设置响应式调整 */
-@media print {
-    .preview-content-small {
-        font-size: 8px !important;
-        line-height: 1.2 !important;
-    }
-}
-
-/* 营养成分表图片自适应 */
-.preview-content img {
-    object-fit: contain;
-    display: block;
-    margin: 0 auto;
-}
-
-/* 确保建议列表不会阻挡输入 */
-.suggestion-list {
-    pointer-events: none;
-}
-.suggestion-list[style*="display: block"] {
-    pointer-events: auto;
 }
 </file>
 

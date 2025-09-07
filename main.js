@@ -115,7 +115,7 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
     height = mmToPoints(130);
   }
   
-  // 判断是否为小尺寸纸张
+  // 判断是否为小尺寸纸张 
   const isSmallPaper = width < mmToPoints(75) && height < mmToPoints(75);
   
   // 根据纸张大小调整边距
@@ -351,35 +351,40 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
       let imageY, imageHeight;
       
       if (isSmallPaper) {
-        // 小纸张：确保图片在下1/3区域
-        const nutritionAreaHeight = contentHeight * 0.33;
-        const nutritionStartY = height - margin - nutritionAreaHeight;
+        // 小纸张：使用动态计算的营养成分表空间
+        imageY = currentY + 3; // 文字内容结束后留3点间隔
+        imageHeight = height - margin - imageY; // 使用剩余的所有空间
         
-        // 确保文字不会进入营养成分表区域
-        if (currentY > nutritionStartY) {
-          // 文字已经进入营养区域，需要调整
-          console.log('Warning: Text overflow into nutrition area');
+        // 确保至少有最小显示空间
+        if (imageHeight > 15) {
+          // 将base64转换为buffer
+          const imageBuffer = Buffer.from(labelData.nutritionImage.split(',')[1], 'base64');
+          
+          // 对于小纸张，使用精确尺寸而不是保持宽高比，允许图片被压扁
+          // 这样可以确保营养成分表完全显示，即使会被压扁
+          doc.image(imageBuffer, margin, imageY, {
+            width: contentWidth,
+            height: imageHeight
+            // 不使用fit选项，图片会被拉伸适应尺寸
+          });
         }
-        
-        imageY = Math.max(nutritionStartY, currentY + 5); // 留5点间隔
-        imageHeight = Math.min(nutritionAreaHeight - 5, height - margin - imageY);
       } else {
-        // 大纸张：在文字下方显示
+        // 大纸张：在文字下方显示，保持宽高比
         const remainingHeight = height - margin - currentY;
         imageY = currentY + 5;
         imageHeight = Math.min(remainingHeight - 5, contentWidth * 0.8);
-      }
-      
-      if (imageHeight > 10) {
-        // 将base64转换为buffer
-        const imageBuffer = Buffer.from(labelData.nutritionImage.split(',')[1], 'base64');
-        doc.image(imageBuffer, margin, imageY, {
-          width: contentWidth,
-          height: imageHeight,
-          fit: [contentWidth, imageHeight],
-          align: 'center',
-          valign: 'center'
-        });
+        
+        if (imageHeight > 10) {
+          // 将base64转换为buffer
+          const imageBuffer = Buffer.from(labelData.nutritionImage.split(',')[1], 'base64');
+          doc.image(imageBuffer, margin, imageY, {
+            width: contentWidth,
+            height: imageHeight,
+            fit: [contentWidth, imageHeight], // 大纸张保持宽高比
+            align: 'center',
+            valign: 'center'
+          });
+        }
       }
     } catch (e) {
       console.error('Failed to add nutrition image:', e);
