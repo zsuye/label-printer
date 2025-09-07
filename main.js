@@ -19,14 +19,10 @@ function createWindow() {
   });
 
   mainWindow.loadFile('index.html');
-  
-  // 开发时打开DevTools
-  // mainWindow.webContents.openDevTools();
 }
 
 app.whenReady().then(() => {
   createWindow();
-
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
@@ -99,7 +95,7 @@ ipcMain.handle('import-labels', async () => {
   return null;
 });
 
-// 生成PDF
+// 生成PDF - 改进版，支持自适应布局
 ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
   const tempPath = path.join(app.getPath('temp'), `label_${Date.now()}.pdf`);
   
@@ -119,23 +115,27 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
     height = mmToPoints(130);
   }
   
+  // 判断是否为小尺寸纸张
+  const isSmallPaper = width < mmToPoints(75) && height < mmToPoints(75);
+  
+  // 根据纸张大小调整边距
+  const margin = isSmallPaper ? mmToPoints(3) : mmToPoints(5);
+  
   const doc = new PDFDocument({
     size: [width, height],
     margins: {
-      top: mmToPoints(5),
-      bottom: mmToPoints(5),
-      left: mmToPoints(5),
-      right: mmToPoints(5)
+      top: margin,
+      bottom: margin,
+      left: margin,
+      right: margin
     }
   });
   
   const stream = fs.createWriteStream(tempPath);
   doc.pipe(stream);
   
-  // 注册中文字体（需要您提供中文字体文件）
-  // 如果没有中文字体，可以使用系统字体或下载开源字体
+  // 注册中文字体
   try {
-    // Windows系统字体路径
     if (process.platform === 'win32') {
       const fontPath = 'C:/Windows/Fonts/simhei.ttf';
       if (fs.existsSync(fontPath)) {
@@ -147,25 +147,29 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
   }
   
   // 可用区域
-  const contentWidth = width - mmToPoints(10);
-  const contentHeight = height - mmToPoints(10);
-  let currentY = mmToPoints(5);
+  const contentWidth = width - (margin * 2);
+  const contentHeight = height - (margin * 2);
+  let currentY = margin;
   
-  // 设置字体
-  const fontSize = Math.min(12, contentWidth / 20);
-  doc.fontSize(fontSize);
+  // 根据纸张大小动态调整字体大小
+  let baseFontSize;
+  if (isSmallPaper) {
+    baseFontSize = Math.min(8, contentWidth / 30);
+  } else {
+    baseFontSize = Math.min(12, contentWidth / 20);
+  }
   
   // 如果品名要独立显示在顶部
   if (settings.showProductNameOnTop && labelData.productName) {
-    doc.font('Chinese').fontSize(fontSize * 1.5)
-       .text(labelData.productName, mmToPoints(5), currentY, {
+    doc.font('Chinese').fontSize(baseFontSize * 1.3)
+       .text(labelData.productName, margin, currentY, {
          width: contentWidth,
          align: 'center'
        });
-    currentY += fontSize * 2;
+    currentY += baseFontSize * 1.8;
   }
   
-  // 显示各个字段
+  // 定义字段顺序和显示
   const fields = [
     { key: 'productName', label: '品名' },
     { key: 'ingredients', label: '配料' },
@@ -186,47 +190,157 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
     { key: 'tips', label: '温馨提示' }
   ];
   
-  doc.fontSize(fontSize);
+  doc.fontSize(baseFontSize);
   
-  for (const field of fields) {
-    if (labelData[field.key]) {
-      // 跳过已经在顶部显示的品名
-      if (settings.showProductNameOnTop && field.key === 'productName') {
-        continue;
+  // 根据纸张大小选择布局方式
+  if (isSmallPaper) {
+    // 小纸张：紧凑布局，多个字段放在同一行
+    let lineBuffer = [];
+    let lineWidth = 0;
+    const separator = '  '; // 两个空格分隔
+    const separatorWidth = doc.widthOfString(separator);
+    
+    // 预留营养成分表空间（下1/3）
+    const nutritionHeight = labelData.nutritionImage ? contentHeight * 0.33 : 0;
+    const textAreaHeight = contentHeight - nutritionHeight;
+    
+    for (const field of fields) {
+      if (labelData[field.key]) {
+        // 跳过已经在顶部显示的品名
+        if (settings.showProductNameOnTop && field.key === 'productName') {
+          continue;
+        }
+        
+        const text = `${field.label}：${labelData[field.key]}`;
+        const textWidth = doc.widthOfString(text);
+        
+        // 判断是否需要换行
+        if (lineWidth + textWidth + (lineBuffer.length > 0 ? separatorWidth : 0) > contentWidth || 
+            // 某些字段强制独占一行
+            ['ingredients', 'address', 'usage', 'tips', 'allergen'].includes(field.key)) {
+          
+          // 输出当前行
+          if (lineBuffer.length > 0) {
+            if (currentY < margin + textAreaHeight - baseFontSize) {
+              doc.font('Chinese').text(lineBuffer.join(separator), margin, currentY, {
+                width: contentWidth,
+                align: 'left'
+              });
+              currentY += baseFontSize * 1.3;
+            }
+            lineBuffer = [];
+            lineWidth = 0;
+          }
+          
+          // 长文本字段独占行
+          if (['ingredients', 'address', 'usage', 'tips', 'allergen'].includes(field.key)) {
+            if (currentY < margin + textAreaHeight - baseFontSize) {
+              const lines = doc.heightOfString(text, { width: contentWidth });
+              doc.font('Chinese').text(text, margin, currentY, {
+                width: contentWidth,
+                align: 'left'
+              });
+              currentY += lines + 2;
+            }
+          } else {
+            lineBuffer.push(text);
+            lineWidth = textWidth;
+          }
+        } else {
+          // 添加到当前行
+          lineBuffer.push(text);
+          lineWidth += textWidth + (lineBuffer.length > 1 ? separatorWidth : 0);
+        }
       }
-      
-      const text = `${field.label}：${labelData[field.key]}`;
-      const lines = doc.heightOfString(text, { width: contentWidth });
-      
-      // 检查是否超出页面
-      if (currentY + lines > height - mmToPoints(5)) {
-        break;
-      }
-      
-      doc.font('Chinese').text(text, mmToPoints(5), currentY, {
+    }
+    
+    // 输出最后一行
+    if (lineBuffer.length > 0 && currentY < margin + textAreaHeight - baseFontSize) {
+      doc.font('Chinese').text(lineBuffer.join(separator), margin, currentY, {
         width: contentWidth,
         align: 'left'
       });
-      currentY += lines + 2;
+      currentY += baseFontSize * 1.3;
     }
-  }
-  
-  // 显示额外字段
-  if (labelData.extraFields && labelData.extraFields.length > 0) {
-    for (const field of labelData.extraFields) {
-      if (field.label && field.value) {
-        const text = `${field.label}：${field.value}`;
+    
+    // 额外字段也采用紧凑布局
+    if (labelData.extraFields && labelData.extraFields.length > 0) {
+      lineBuffer = [];
+      lineWidth = 0;
+      
+      for (const field of labelData.extraFields) {
+        if (field.label && field.value) {
+          const text = `${field.label}：${field.value}`;
+          const textWidth = doc.widthOfString(text);
+          
+          if (lineWidth + textWidth + (lineBuffer.length > 0 ? separatorWidth : 0) > contentWidth) {
+            if (lineBuffer.length > 0 && currentY < margin + textAreaHeight - baseFontSize) {
+              doc.font('Chinese').text(lineBuffer.join(separator), margin, currentY, {
+                width: contentWidth,
+                align: 'left'
+              });
+              currentY += baseFontSize * 1.3;
+              lineBuffer = [];
+              lineWidth = 0;
+            }
+          }
+          
+          lineBuffer.push(text);
+          lineWidth += textWidth + (lineBuffer.length > 1 ? separatorWidth : 0);
+        }
+      }
+      
+      if (lineBuffer.length > 0 && currentY < margin + textAreaHeight - baseFontSize) {
+        doc.font('Chinese').text(lineBuffer.join(separator), margin, currentY, {
+          width: contentWidth,
+          align: 'left'
+        });
+        currentY += baseFontSize * 1.3;
+      }
+    }
+    
+  } else {
+    // 大纸张：传统的一行一个字段布局
+    for (const field of fields) {
+      if (labelData[field.key]) {
+        // 跳过已经在顶部显示的品名
+        if (settings.showProductNameOnTop && field.key === 'productName') {
+          continue;
+        }
+        
+        const text = `${field.label}：${labelData[field.key]}`;
         const lines = doc.heightOfString(text, { width: contentWidth });
         
-        if (currentY + lines > height - mmToPoints(5)) {
+        // 检查是否超出页面
+        if (currentY + lines > height - margin) {
           break;
         }
         
-        doc.font('Chinese').text(text, mmToPoints(5), currentY, {
+        doc.font('Chinese').text(text, margin, currentY, {
           width: contentWidth,
           align: 'left'
         });
         currentY += lines + 2;
+      }
+    }
+    
+    // 显示额外字段
+    if (labelData.extraFields && labelData.extraFields.length > 0) {
+      for (const field of labelData.extraFields) {
+        if (field.label && field.value) {
+          const text = `${field.label}：${field.value}`;
+          const lines = doc.heightOfString(text, { width: contentWidth });
+          
+          if (currentY + lines > height - margin) {
+            break;
+          }
+          
+          doc.font('Chinese').text(text, margin, currentY, {
+            width: contentWidth,
+            align: 'left'
+          });
+          currentY += lines + 2;
+        }
       }
     }
   }
@@ -234,16 +348,37 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
   // 如果有营养成分表图片
   if (labelData.nutritionImage) {
     try {
-      const remainingHeight = height - mmToPoints(5) - currentY;
-      const imageHeight = Math.min(remainingHeight, contentWidth * 0.8);
+      let imageY, imageHeight;
       
-      if (imageHeight > 20) {
+      if (isSmallPaper) {
+        // 小纸张：确保图片在下1/3区域
+        const nutritionAreaHeight = contentHeight * 0.33;
+        const nutritionStartY = height - margin - nutritionAreaHeight;
+        
+        // 确保文字不会进入营养成分表区域
+        if (currentY > nutritionStartY) {
+          // 文字已经进入营养区域，需要调整
+          console.log('Warning: Text overflow into nutrition area');
+        }
+        
+        imageY = Math.max(nutritionStartY, currentY + 5); // 留5点间隔
+        imageHeight = Math.min(nutritionAreaHeight - 5, height - margin - imageY);
+      } else {
+        // 大纸张：在文字下方显示
+        const remainingHeight = height - margin - currentY;
+        imageY = currentY + 5;
+        imageHeight = Math.min(remainingHeight - 5, contentWidth * 0.8);
+      }
+      
+      if (imageHeight > 10) {
         // 将base64转换为buffer
         const imageBuffer = Buffer.from(labelData.nutritionImage.split(',')[1], 'base64');
-        doc.image(imageBuffer, mmToPoints(5), currentY, {
+        doc.image(imageBuffer, margin, imageY, {
           width: contentWidth,
           height: imageHeight,
-          fit: [contentWidth, imageHeight]
+          fit: [contentWidth, imageHeight],
+          align: 'center',
+          valign: 'center'
         });
       }
     } catch (e) {
@@ -260,15 +395,12 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
   });
 });
 
-// 打印PDF - 方案一：使用pdf-to-printer（推荐）
+// 打印PDF
 ipcMain.handle('print-pdf', async (event, pdfPath, printerName, copies) => {
   try {
-    // 根据操作系统选择打印方式
     if (process.platform === 'win32') {
-      // Windows: 使用 pdf-to-printer
       const ptp = require('pdf-to-printer');
       
-       // 一次性打印多份（pdf-to-printer支持copies参数）
       const options = {
         printer: printerName,
         copies: copies || 1,
@@ -276,20 +408,16 @@ ipcMain.handle('print-pdf', async (event, pdfPath, printerName, copies) => {
       };
       
       await ptp.print(pdfPath, options);
-      
       return { success: true };
     } else {
-      // macOS/Linux: 使用命令行
       const { exec } = require('child_process');
       const util = require('util');
       const execPromise = util.promisify(exec);
       
       let command;
       if (process.platform === 'darwin') {
-        // macOS
         command = `lpr -P "${printerName}" -# ${copies || 1} "${pdfPath}"`;
       } else {
-        // Linux
         command = `lp -d "${printerName}" -n ${copies || 1} "${pdfPath}"`;
       }
       
