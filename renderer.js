@@ -15,6 +15,7 @@ async function saveLabel(e) {
     
     try {
         // 收集表单数据
+        currentLabel.labelName = document.getElementById('labelName').value;
         currentLabel.productName = document.getElementById('productName').value;
         currentLabel.ingredients = document.getElementById('ingredients').value;
         currentLabel.standardNo = document.getElementById('standardNo').value;
@@ -32,6 +33,7 @@ async function saveLabel(e) {
         currentLabel.allergen = document.getElementById('allergen').value;
         currentLabel.tips = document.getElementById('tips').value;
         currentLabel.extraFields = getExtraFields();
+        currentLabel.cornerTag = document.getElementById('cornerTag').value;
         
         // 更新保质期和贮存条件文本
         currentLabel.shelfLife = generateShelfLifeText(currentLabel);
@@ -202,13 +204,14 @@ function renderLabelList() {
     const labelList = document.getElementById('labelList');
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
     
-    // 按品名排序
+    // 按标签名称排序
     const sortedLabels = [...labels].sort((a, b) => 
-        (a.productName || '').localeCompare(b.productName || '', 'zh-CN')
+        (a.labelName || a.productName || '').localeCompare(b.labelName || b.productName || '', 'zh-CN')
     );
-    
-    // 过滤搜索结果
+
+    // 过滤搜索结果（同时搜索标签名称和品名）
     const filteredLabels = sortedLabels.filter(label => 
+        (label.labelName || label.productName || '').toLowerCase().includes(searchTerm) ||
         (label.productName || '').toLowerCase().includes(searchTerm)
     );
     
@@ -224,9 +227,9 @@ function renderLabelList() {
         }
         
         item.innerHTML = `
-            <div class="label-item-name">${label.productName || '未命名标签'}</div>
-            <div class="label-item-info">${label.manufacturer || ''} ${label.netContent || ''}</div>
-        `;
+    <div class="label-item-name">${label.labelName || label.productName || '未命名标签'}</div>
+    <div class="label-item-info">${label.productName || ''} | ${label.netContent || ''}</div>
+`;
         
         item.addEventListener('click', () => selectLabel(label));
         labelList.appendChild(item);
@@ -265,6 +268,7 @@ function selectLabel(label) {
 
 // 填充表单
 function fillForm(label) {
+  document.getElementById('labelName').value = label.labelName || '';
     document.getElementById('productName').value = label.productName || '';
     document.getElementById('ingredients').value = label.ingredients || '';
     document.getElementById('standardNo').value = label.standardNo || '';
@@ -278,6 +282,7 @@ function fillForm(label) {
     document.getElementById('address').value = label.address || '';
     document.getElementById('allergen').value = label.allergen || '';
     document.getElementById('tips').value = label.tips || '';
+    document.getElementById('cornerTag').value = label.cornerTag || '';
     
     // 保质期类型
     document.getElementById('shelfLifeType').value = label.shelfLifeType || 'normal';
@@ -403,6 +408,7 @@ function createNewLabel() {
     const label = {
         id: Date.now().toString(),
         productName: '新标签',
+        productName: '',
         createdAt: new Date().toISOString()
     };
     
@@ -456,7 +462,7 @@ function generateStorageCondition(label) {
 async function deleteCurrentLabel() {
     if (!currentLabel) return;
     
-    if (!window.confirm(`确定要删除标签"${currentLabel.productName}"吗？`)) {
+    if (!window.confirm(`确定要删除标签"${currentLabel.labelName || currentLabel.productName}"吗？`)) {
         return;
     }
     
@@ -595,6 +601,26 @@ function generatePreviewHTML(labelData, settings) {
     } else {
         html = '<div style="font-size:12px;line-height:1.6;">';
     }
+
+     if (labelData.cornerTag) {
+        const tagFontSize = '8px';
+        html += `
+            <div style="
+                position: absolute;
+                top: -5px;
+                right: -5px;
+                border: 1px solid #333;
+                padding: 2px 4px;
+                font-size: ${tagFontSize};
+                line-height: 1.2;
+                background: white;
+                max-width: 50px;
+                word-wrap: break-word;
+                text-align: center;
+                z-index: 10;
+            ">${labelData.cornerTag}</div>
+        `;
+    }
     
     // 如果品名要独立显示在顶部
     if (settings.showProductNameOnTop && labelData.productName) {
@@ -632,12 +658,7 @@ function generatePreviewHTML(labelData, settings) {
     
     for (const field of fields) {
         if (labelData[field.key]) {
-            // 跳过已经在顶部显示的品名
-            if (settings.showProductNameOnTop && field.key === 'productName') {
-                continue;
-            }
-            
-            if (fullText) {
+          if (fullText) {
                 fullText += separator;
             }
             fullText += `<strong>${field.label}：</strong>${labelData[field.key]}`;
@@ -659,7 +680,7 @@ function generatePreviewHTML(labelData, settings) {
     // 输出所有文本作为一个连续的段落
     html += fullText;
     html += '</div>'; 
-    
+
     // 营养成分表 - 小尺寸，严格限制在底部1/3
 if (labelData.nutritionImage) {
     html += `<div style="margin-top:8px;height:33%;max-height:33%;overflow:hidden;display:flex;align-items:center;justify-content:center;">
@@ -671,9 +692,6 @@ if (labelData.nutritionImage) {
         // 大纸张：传统布局
         for (const field of fields) {
             if (labelData[field.key]) {
-                if (settings.showProductNameOnTop && field.key === 'productName') {
-                    continue;
-                }
                 html += `<div><strong>${field.label}：</strong>${labelData[field.key]}</div>`;
             }
         }

@@ -191,6 +191,38 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
   ];
   
   doc.fontSize(baseFontSize);
+
+  if (labelData.cornerTag) {
+    const tagText = labelData.cornerTag;
+    const tagFontSize = 8;
+    const tagPadding = 2;
+    
+    // 设置字体
+    doc.font('Chinese').fontSize(tagFontSize);
+    
+    // 计算文字宽度
+    const tagWidth = Math.min(doc.widthOfString(tagText) + (tagPadding * 2), mmToPoints(15));
+    const tagHeight = tagFontSize + (tagPadding * 2);
+    
+    // 右上角位置
+    const tagX = width - margin - tagWidth - mmToPoints(2);
+    const tagY = margin;
+    
+    // 绘制边框
+    doc.rect(tagX, tagY, tagWidth, tagHeight)
+      .stroke();
+    
+    // 绘制文字（支持自动换行）
+    doc.text(tagText, tagX + tagPadding, tagY + tagPadding, {
+      width: tagWidth - (tagPadding * 2),
+      height: tagHeight - (tagPadding * 2),
+      align: 'center',
+      lineBreak: true
+    });
+    
+    // 恢复字体大小
+    doc.fontSize(baseFontSize);
+  }
   
   // 根据纸张大小选择布局方式
   if (isSmallPaper) {
@@ -205,11 +237,6 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
     // 构建完整的文本内容
     for (const field of fields) {
       if (labelData[field.key]) {
-        // 跳过已经在顶部显示的品名
-        if (settings.showProductNameOnTop && field.key === 'productName') {
-          continue;
-        }
-        
         if (fullText) {
           fullText += separator;
         }
@@ -263,11 +290,6 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
     // 大纸张：传统的一行一个字段布局
     for (const field of fields) {
       if (labelData[field.key]) {
-        // 跳过已经在顶部显示的品名
-        if (settings.showProductNameOnTop && field.key === 'productName') {
-          continue;
-        }
-        
         const text = `${field.label}：${labelData[field.key]}`;
         const lines = doc.heightOfString(text, { width: contentWidth });
         

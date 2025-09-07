@@ -19,7 +19,7 @@
                 </div>
             </div>
             <div class="search-box">
-                <input type="text" id="searchInput" placeholder="搜索标签...">
+                <input type="text" id="searchInput" placeholder="搜索标签名称或品名...">
             </div>
             <div id="labelList" class="label-list"></div>
         </div>
@@ -36,6 +36,11 @@
                 <div class="editor-panel">
                     <h3>标签内容编辑</h3>
                     <form id="labelForm">
+                         <div class="form-group">
+                            <label>标签名称 *</label>
+                            <input type="text" id="labelName" placeholder="用于识别和管理标签" required>
+                        </div>
+                        
                         <div class="form-group">
                             <label>品名 *</label>
                             <input type="text" id="productName" required>
@@ -115,6 +120,12 @@
                             <label>温馨提示（可选）</label>
                             <textarea id="tips" rows="2"></textarea>
                         </div>
+
+                        <div class="form-group">
+    <label>角标文字（可选）</label>
+    <input type="text" id="cornerTag" placeholder="如：12盒" maxlength="5">
+    <small style="color: #666;">最多5个字，显示在右上角</small>
+</div>
                         
                         <div class="form-group">
                             <label>营养成分表（上传图片）</label>
