@@ -142,6 +142,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // 先设置基础事件监听
     setupEventListeners();
+    setupFormChangeListeners();
     
     // 然后设置输入记忆（延迟一下确保DOM完全就绪）
     setTimeout(() => {
@@ -236,6 +237,9 @@ function renderLabelList() {
 function selectLabel(label) {
     currentLabel = label;
     
+    // 清空之前的PDF路径，确保切换标签后重新生成PDF
+    currentPdfPath = null;
+    
     // 更新列表选中状态
     document.querySelectorAll('.label-item').forEach(item => {
         item.classList.remove('active');
@@ -254,9 +258,10 @@ function selectLabel(label) {
     // 加载该标签的打印设置
     loadLabelSettings(label.id);
     
-    // 清空预览
-    document.getElementById('previewContent').innerHTML = '<p>点击预览按钮查看标签效果</p>';
+    // 清空预览区域，提示用户需要重新预览
+    document.getElementById('previewContent').innerHTML = '<p>标签已切换，点击预览按钮查看新标签效果</p>';
 }
+
 
 // 填充表单
 function fillForm(label) {
@@ -409,7 +414,7 @@ function createNewLabel() {
 
 
 
-// 生成保质期文本
+// 生成保质期文本 - 符合GB7718-2025标准
 function generateShelfLifeText(label) {
     const type = label.shelfLifeType;
     const normal = label.normalDays;
@@ -417,11 +422,11 @@ function generateShelfLifeText(label) {
     
     switch(type) {
         case 'normalWithCold':
-            return `常温${normal}天，开封后需冷藏`;
+            return `${normal}天`;
         case 'normalWithFrozen':
-            return `常温${normal}天，开封后需冷冻`;
+            return `${normal}天`;
         case 'frozen':
-            return `冷冻${frozen}天`;
+            return `${frozen}天`;
         case 'dual':
             return `常温${normal}天，冷冻${frozen}天`;
         default:
@@ -429,21 +434,21 @@ function generateShelfLifeText(label) {
     }
 }
 
-// 生成贮存条件
+// 生成贮存条件 - 符合GB7718-2025标准
 function generateStorageCondition(label) {
     const type = label.shelfLifeType;
     
     switch(type) {
         case 'normalWithCold':
-            return '常温保存，开封后需冷藏';
+            return '常温贮存，开封后需冷藏';
         case 'normalWithFrozen':
-            return '常温保存，开封后需冷冻';
+            return '常温贮存，开封后需冷冻';
         case 'frozen':
-            return '冷冻保存（≤-18℃）';
+            return '冷冻贮存（≤-18℃）';
         case 'dual':
-            return '常温保存或冷冻保存（≤-18℃）';
+            return '常温贮存或冷冻贮存（≤-18℃）';
         default:
-            return '常温保存，避免阳光直射';
+            return '常温贮存，避免阳光直射';
     }
 }
 
@@ -531,7 +536,7 @@ async function saveLabelSettings() {
     }
 }
 
-// 更新保质期至日期
+// 更新保质期到期日 - 改进版本
 function updateExpiryDate() {
     if (!currentLabel) return;
     
@@ -793,6 +798,38 @@ async function previewLabel() {
     previewContent.innerHTML = generatePreviewHTML(labelData, settings);
 }
 
+// 可选：也可以在表单发生变化时清空PDF缓存
+function onFormDataChange() {
+    // 当表单数据发生变化时，清空PDF缓存，确保下次预览/打印使用最新数据
+    currentPdfPath = null;
+    
+    // 清空预览内容，提示用户重新预览
+    const previewContent = document.getElementById('previewContent');
+    if (previewContent.innerHTML !== '<p>点击预览按钮查看标签效果</p>') {
+        previewContent.innerHTML = '<p>内容已修改，点击预览按钮查看最新效果</p>';
+    }
+}
+// 可以为主要的输入框添加change监听器
+function setupFormChangeListeners() {
+    const mainInputs = [
+        'productName', 'ingredients', 'standardNo', 'licenseNo',
+        'netContent', 'boxSpec', 'origin', 'usage', 'manufacturer',
+        'phone', 'address', 'allergen', 'tips', 'shelfLifeType',
+        'normalDays', 'frozenDays'
+    ];
+    
+    mainInputs.forEach(inputId => {
+        const element = document.getElementById(inputId);
+        if (element) {
+            element.addEventListener('change', onFormDataChange);
+            element.addEventListener('input', onFormDataChange);
+        }
+    });
+    
+    // 生产日期变化时也清空PDF缓存
+    document.getElementById('productionDate').addEventListener('change', onFormDataChange);
+}
+
 // 打印标签
 async function printLabel() {
     if (!currentLabel) {
@@ -820,10 +857,9 @@ async function printLabel() {
         printBtn.disabled = true;
         printBtn.textContent = '打印中...';
         
-        // 如果还没有生成PDF，先生成
-        if (!currentPdfPath) {
-            await previewLabel();
-        }
+        // 强制重新生成PDF，确保打印的是当前标签
+        // 移除 if (!currentPdfPath) 的判断，每次都重新生成
+        await previewLabel();
         
         // 打印
         const result = await window.electronAPI.printPDF(currentPdfPath, printer, copies);
@@ -870,6 +906,10 @@ async function exportLabels() {
     }
 }
 
+// 全局变量，用于控制建议列表的显示
+let hideTimeout = null;
+let isMouseOverSuggestions = false;
+
 // 输入记忆功能
 function setupInputMemory() {
     const inputs = document.querySelectorAll('input[type="text"], textarea');
@@ -880,13 +920,16 @@ function setupInputMemory() {
             showSuggestions(e.target);
         });
         
-        // 更新输入历史 - 修改blur事件处理
+        // 更新输入历史 - 修改blur事件处理，增加延迟时间
         input.addEventListener('blur', (e) => {
-            // 延迟执行，给点击建议项留出时间
-            setTimeout(() => {
-                updateInputHistory(e.target.id, e.target.value);
-                hideSuggestions();
-            }, 250);
+            // 延迟执行，给点击建议项留出更多时间
+            hideTimeout = setTimeout(() => {
+                // 如果鼠标不在建议列表上，才隐藏
+                if (!isMouseOverSuggestions) {
+                    updateInputHistory(e.target.id, e.target.value);
+                    hideSuggestions();
+                }
+            }, 800); // 增加到800ms
         });
         
         // 键盘导航
@@ -905,28 +948,37 @@ function setupInputMemory() {
         const suggestionList = document.getElementById('suggestionList');
         const isInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
         const isSuggestion = e.target.classList.contains('suggestion-item');
+        const isSuggestionList = e.target.id === 'suggestionList' || 
+                                e.target.closest('#suggestionList');
         
-        if (!isInput && !isSuggestion) {
+        if (!isInput && !isSuggestion && !isSuggestionList) {
+            clearTimeout(hideTimeout);
             hideSuggestions();
         }
     });
 }
 
-// 显示建议列表
+// 显示建议列表 - 改进版
 function showSuggestions(input) {
+    // 清除之前的隐藏定时器
+    if (hideTimeout) {
+        clearTimeout(hideTimeout);
+        hideTimeout = null;
+    }
+    
     // 确保输入框没有被禁用
     if (input.disabled || input.readOnly) {
         return;
     }
     
     const fieldId = input.id;
-    if (!fieldId) return; // 没有ID的输入框不显示建议
+    if (!fieldId) return;
     
     const history = inputHistory[fieldId] || [];
     const currentValue = input.value.toLowerCase();
     
     const filtered = history.filter(item => 
-        item && item.toLowerCase().includes(currentValue)
+        item && item.toLowerCase().includes(currentValue) && item !== input.value
     );
     
     const suggestionList = document.getElementById('suggestionList');
@@ -938,7 +990,24 @@ function showSuggestions(input) {
     
     suggestionList.innerHTML = '';
     
-    filtered.slice(0, 10).forEach((item, index) => { // 限制最多显示10个建议
+    // 添加鼠标事件监听
+    suggestionList.addEventListener('mouseenter', () => {
+        isMouseOverSuggestions = true;
+        if (hideTimeout) {
+            clearTimeout(hideTimeout);
+            hideTimeout = null;
+        }
+    });
+    
+    suggestionList.addEventListener('mouseleave', () => {
+        isMouseOverSuggestions = false;
+        // 鼠标离开建议列表后，延迟隐藏
+        hideTimeout = setTimeout(() => {
+            hideSuggestions();
+        }, 300);
+    });
+    
+    filtered.slice(0, 10).forEach((item, index) => {
         const div = document.createElement('div');
         div.className = 'suggestion-item';
         div.textContent = item;
@@ -947,10 +1016,24 @@ function showSuggestions(input) {
         // 使用mousedown而不是click，避免blur事件冲突
         div.addEventListener('mousedown', (e) => {
             e.preventDefault(); // 阻止默认行为，防止输入框失去焦点
+            e.stopPropagation(); // 阻止事件冒泡
             input.value = item;
             hideSuggestions();
             // 触发input事件，以便其他监听器能够响应
             input.dispatchEvent(new Event('input', { bubbles: true }));
+            // 重新聚焦到输入框
+            setTimeout(() => {
+                input.focus();
+            }, 10);
+        });
+        
+        // 添加hover效果
+        div.addEventListener('mouseenter', () => {
+            // 清除之前的选中状态
+            suggestionList.querySelectorAll('.suggestion-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            div.classList.add('selected');
         });
         
         suggestionList.appendChild(div);
@@ -968,19 +1051,33 @@ function showSuggestions(input) {
     if (listRect.bottom > window.innerHeight) {
         suggestionList.style.top = (rect.top - listRect.height - 2) + 'px';
     }
+    if (listRect.right > window.innerWidth) {
+        suggestionList.style.left = (window.innerWidth - listRect.width - 10) + 'px';
+    }
 }
 
-
-// 隐藏建议列表
+// 隐藏建议列表 - 改进版
 function hideSuggestions() {
     const suggestionList = document.getElementById('suggestionList');
     if (suggestionList) {
         suggestionList.style.display = 'none';
-        suggestionList.innerHTML = ''; // 清空内容，避免残留
+        suggestionList.innerHTML = '';
+        // 移除鼠标事件监听器（通过克隆节点的方式）
+        const newSuggestionList = suggestionList.cloneNode(false);
+        suggestionList.parentNode.replaceChild(newSuggestionList, suggestionList);
+        newSuggestionList.id = 'suggestionList';
+        newSuggestionList.className = 'suggestion-list';
+    }
+    
+    // 重置状态
+    isMouseOverSuggestions = false;
+    if (hideTimeout) {
+        clearTimeout(hideTimeout);
+        hideTimeout = null;
     }
 }
 
-// 处理建议列表键盘导航
+// 处理建议列表键盘导航 - 改进版
 function handleSuggestionNavigation(e) {
     const suggestionList = document.getElementById('suggestionList');
     if (!suggestionList || suggestionList.style.display === 'none') return;
@@ -1007,8 +1104,9 @@ function handleSuggestionNavigation(e) {
                 hideSuggestions();
                 // 触发input事件
                 e.target.dispatchEvent(new Event('input', { bubbles: true }));
+                return;
             }
-            return;
+            break;
         case 'Escape':
             e.preventDefault();
             hideSuggestions();
