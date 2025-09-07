@@ -1,0 +1,13 @@
+# Add patterns to ignore here, one per line
+# Example:
+# *.log
+# tmp/
+public/
+.gitignore
+.gitattributes
+.env
+config.ini
+natapp.exe
+data/
+services/prompt-template.txt
+start_ai_bazi.bat

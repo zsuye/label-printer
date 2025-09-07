@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>标签打印器</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 左侧标签列表 -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>标签列表</h2>
+                <div class="sidebar-actions">
+                    <button id="addLabelBtn" class="btn btn-primary">新增标签</button>
+                    <button id="importBtn" class="btn">导入</button>
+                    <button id="exportBtn" class="btn">导出</button>
+                </div>
+            </div>
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="搜索标签...">
+            </div>
+            <div id="labelList" class="label-list"></div>
+        </div>
+
+        <!-- 主内容区 -->
+        <div class="main-content">
+            <div id="welcomeView" class="welcome-view">
+                <h2>欢迎使用标签打印器</h2>
+                <p>请从左侧选择一个标签开始编辑，或创建新标签</p>
+            </div>
+
+            <div id="editorView" class="editor-view" style="display: none;">
+                <!-- 编辑区 -->
+                <div class="editor-panel">
+                    <h3>标签内容编辑</h3>
+                    <form id="labelForm">
+                        <div class="form-group">
+                            <label>品名 *</label>
+                            <input type="text" id="productName" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>配料</label>
+                            <textarea id="ingredients" rows="2"></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>产品标准号</label>
+                            <input type="text" id="standardNo">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>生产许可证号</label>
+                            <input type="text" id="licenseNo">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>保质期</label>
+                            <select id="shelfLifeType">
+                                <option value="normal">常温保存</option>
+                                <option value="normalWithCold">常温保存，开封后冷藏</option>
+                                <option value="normalWithFrozen">常温保存，开封后冷冻</option>
+                                <option value="frozen">仅冷冻保存</option>
+                                <option value="dual">常温/冷冻双重保存</option>
+                            </select>
+                            <div id="shelfLifeInputs" class="shelf-life-inputs">
+                                <input type="number" id="normalDays" placeholder="常温天数" min="1">
+                                <input type="number" id="frozenDays" placeholder="冷冻天数" min="1" style="display:none;">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>净含量</label>
+                            <input type="text" id="netContent">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>箱规（可选）</label>
+                            <input type="text" id="boxSpec">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>产地</label>
+                            <input type="text" id="origin">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>食用方法</label>
+                            <textarea id="usage" rows="2"></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>生产商</label>
+                            <input type="text" id="manufacturer">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>联系电话</label>
+                            <input type="text" id="phone">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>地址</label>
+                            <input type="text" id="address">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>致敏物质提示（可选）</label>
+                            <input type="text" id="allergen">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>温馨提示（可选）</label>
+                            <textarea id="tips" rows="2"></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>营养成分表（上传图片）</label>
+                            <input type="file" id="nutritionImage" accept="image/*">
+                            <div id="nutritionPreview" class="image-preview"></div>
+                        </div>
+                        
+                        <!-- 额外字段 -->
+                        <div class="form-group">
+                            <label>额外字段</label>
+                            <div id="extraFields"></div>
+                            <button type="button" id="addExtraFieldBtn" class="btn btn-small">添加字段</button>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">保存标签</button>
+                            <button type="button" id="deleteLabelBtn" class="btn btn-danger">删除标签</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- 预览和打印区 -->
+                <div class="preview-panel">
+                    <h3>打印设置</h3>
+                    
+                    <div class="print-settings">
+                        <div class="form-group">
+                            <label>生产日期 *</label>
+                            <input type="date" id="productionDate" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>打印机</label>
+                            <select id="printerSelect">
+                                <option value="">选择打印机...</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>纸张大小</label>
+                            <select id="paperSize">
+                                <option value="76x130mm">76x130mm（默认）</option>
+                                <option value="70x70mm">70x70mm</option>
+                                <option value="custom">自定义</option>
+                            </select>
+                            <div id="customSizeInputs" style="display:none;">
+                                <input type="number" id="customWidth" placeholder="宽度(mm)" min="10">
+                                <input type="number" id="customHeight" placeholder="高度(mm)" min="10">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="showProductNameOnTop">
+                                品名独立显示在顶部
+                            </label>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>打印份数</label>
+                            <input type="number" id="printCopies" value="1" min="1" max="10000">
+                        </div>
+                        
+                        <div class="print-actions">
+                            <button id="previewBtn" class="btn">预览</button>
+                            <button id="printBtn" class="btn btn-primary">打印</button>
+                        </div>
+                    </div>
+                    
+                    <div class="preview-area">
+                        <h4>预览区域</h4>
+                        <div id="previewContent" class="preview-content">
+                            <p>点击预览按钮查看标签效果</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 输入记忆下拉菜单 -->
+    <div id="suggestionList" class="suggestion-list" style="display:none;"></div>
+    
+    <script src="renderer.js"></script>
+</body>
+</html>

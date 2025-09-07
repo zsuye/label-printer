@@ -1,0 +1,1846 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+.repomixignore
+index.html
+main.js
+package.json
+preload.js
+renderer.js
+repomix.config.json
+style.css
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path=".repomixignore">
+# Add patterns to ignore here, one per line
+# Example:
+# *.log
+# tmp/
+public/
+.gitignore
+.gitattributes
+.env
+config.ini
+natapp.exe
+data/
+services/prompt-template.txt
+start_ai_bazi.bat
+</file>
+
+<file path="index.html">
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>标签打印器</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 左侧标签列表 -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>标签列表</h2>
+                <div class="sidebar-actions">
+                    <button id="addLabelBtn" class="btn btn-primary">新增标签</button>
+                    <button id="importBtn" class="btn">导入</button>
+                    <button id="exportBtn" class="btn">导出</button>
+                </div>
+            </div>
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="搜索标签...">
+            </div>
+            <div id="labelList" class="label-list"></div>
+        </div>
+
+        <!-- 主内容区 -->
+        <div class="main-content">
+            <div id="welcomeView" class="welcome-view">
+                <h2>欢迎使用标签打印器</h2>
+                <p>请从左侧选择一个标签开始编辑，或创建新标签</p>
+            </div>
+
+            <div id="editorView" class="editor-view" style="display: none;">
+                <!-- 编辑区 -->
+                <div class="editor-panel">
+                    <h3>标签内容编辑</h3>
+                    <form id="labelForm">
+                        <div class="form-group">
+                            <label>品名 *</label>
+                            <input type="text" id="productName" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>配料</label>
+                            <textarea id="ingredients" rows="2"></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>产品标准号</label>
+                            <input type="text" id="standardNo">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>生产许可证号</label>
+                            <input type="text" id="licenseNo">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>保质期</label>
+                            <select id="shelfLifeType">
+                                <option value="normal">常温保存</option>
+                                <option value="normalWithCold">常温保存，开封后冷藏</option>
+                                <option value="normalWithFrozen">常温保存，开封后冷冻</option>
+                                <option value="frozen">仅冷冻保存</option>
+                                <option value="dual">常温/冷冻双重保存</option>
+                            </select>
+                            <div id="shelfLifeInputs" class="shelf-life-inputs">
+                                <input type="number" id="normalDays" placeholder="常温天数" min="1">
+                                <input type="number" id="frozenDays" placeholder="冷冻天数" min="1" style="display:none;">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>净含量</label>
+                            <input type="text" id="netContent">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>箱规（可选）</label>
+                            <input type="text" id="boxSpec">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>产地</label>
+                            <input type="text" id="origin">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>食用方法</label>
+                            <textarea id="usage" rows="2"></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>生产商</label>
+                            <input type="text" id="manufacturer">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>联系电话</label>
+                            <input type="text" id="phone">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>地址</label>
+                            <input type="text" id="address">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>致敏物质提示（可选）</label>
+                            <input type="text" id="allergen">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>温馨提示（可选）</label>
+                            <textarea id="tips" rows="2"></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>营养成分表（上传图片）</label>
+                            <input type="file" id="nutritionImage" accept="image/*">
+                            <div id="nutritionPreview" class="image-preview"></div>
+                        </div>
+                        
+                        <!-- 额外字段 -->
+                        <div class="form-group">
+                            <label>额外字段</label>
+                            <div id="extraFields"></div>
+                            <button type="button" id="addExtraFieldBtn" class="btn btn-small">添加字段</button>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">保存标签</button>
+                            <button type="button" id="deleteLabelBtn" class="btn btn-danger">删除标签</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- 预览和打印区 -->
+                <div class="preview-panel">
+                    <h3>打印设置</h3>
+                    
+                    <div class="print-settings">
+                        <div class="form-group">
+                            <label>生产日期 *</label>
+                            <input type="date" id="productionDate" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>打印机</label>
+                            <select id="printerSelect">
+                                <option value="">选择打印机...</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>纸张大小</label>
+                            <select id="paperSize">
+                                <option value="76x130mm">76x130mm（默认）</option>
+                                <option value="70x70mm">70x70mm</option>
+                                <option value="custom">自定义</option>
+                            </select>
+                            <div id="customSizeInputs" style="display:none;">
+                                <input type="number" id="customWidth" placeholder="宽度(mm)" min="10">
+                                <input type="number" id="customHeight" placeholder="高度(mm)" min="10">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="showProductNameOnTop">
+                                品名独立显示在顶部
+                            </label>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>打印份数</label>
+                            <input type="number" id="printCopies" value="1" min="1" max="10000">
+                        </div>
+                        
+                        <div class="print-actions">
+                            <button id="previewBtn" class="btn">预览</button>
+                            <button id="printBtn" class="btn btn-primary">打印</button>
+                        </div>
+                    </div>
+                    
+                    <div class="preview-area">
+                        <h4>预览区域</h4>
+                        <div id="previewContent" class="preview-content">
+                            <p>点击预览按钮查看标签效果</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 输入记忆下拉菜单 -->
+    <div id="suggestionList" class="suggestion-list" style="display:none;"></div>
+    
+    <script src="renderer.js"></script>
+</body>
+</html>
+</file>
+
+<file path="main.js">
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const path = require('path');
+const fs = require('fs');
+const PDFDocument = require('pdfkit');
+const Store = require('electron-store');
+
+const store = new Store();
+let mainWindow;
+
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1400,
+    height: 900,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
+    }
+  });
+
+  mainWindow.loadFile('index.html');
+  
+  // 开发时打开DevTools
+  // mainWindow.webContents.openDevTools();
+}
+
+app.whenReady().then(() => {
+  createWindow();
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
+
+// 获取打印机列表
+ipcMain.handle('get-printers', async () => {
+  const printers = await mainWindow.webContents.getPrintersAsync();
+  return printers;
+});
+
+// 保存数据
+ipcMain.handle('save-data', (event, key, value) => {
+  store.set(key, value);
+  return true;
+});
+
+// 获取数据
+ipcMain.handle('get-data', (event, key) => {
+  return store.get(key);
+});
+
+// 删除数据
+ipcMain.handle('delete-data', (event, key) => {
+  store.delete(key);
+  return true;
+});
+
+// 获取所有标签
+ipcMain.handle('get-all-labels', () => {
+  return store.get('labels', []);
+});
+
+// 导出标签数据
+ipcMain.handle('export-labels', async () => {
+  const labels = store.get('labels', []);
+  const { filePath } = await dialog.showSaveDialog({
+    defaultPath: `labels_${new Date().toISOString().split('T')[0]}.json`,
+    filters: [{ name: 'JSON', extensions: ['json'] }]
+  });
+  
+  if (filePath) {
+    fs.writeFileSync(filePath, JSON.stringify(labels, null, 2));
+    return true;
+  }
+  return false;
+});
+
+// 导入标签数据
+ipcMain.handle('import-labels', async () => {
+  const { filePaths } = await dialog.showOpenDialog({
+    filters: [{ name: 'JSON', extensions: ['json'] }],
+    properties: ['openFile']
+  });
+  
+  if (filePaths && filePaths.length > 0) {
+    const data = fs.readFileSync(filePaths[0], 'utf8');
+    const labels = JSON.parse(data);
+    store.set('labels', labels);
+    return labels;
+  }
+  return null;
+});
+
+// 生成PDF
+ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
+  const tempPath = path.join(app.getPath('temp'), `label_${Date.now()}.pdf`);
+  
+  // 设置纸张大小（转换mm到points）
+  const mmToPoints = (mm) => mm * 2.83465;
+  let width, height;
+  
+  if (settings.paperSize === 'custom' && settings.customWidth && settings.customHeight) {
+    width = mmToPoints(parseFloat(settings.customWidth));
+    height = mmToPoints(parseFloat(settings.customHeight));
+  } else if (settings.paperSize === '70x70mm') {
+    width = mmToPoints(70);
+    height = mmToPoints(70);
+  } else {
+    // 默认 76x130mm
+    width = mmToPoints(76);
+    height = mmToPoints(130);
+  }
+  
+  const doc = new PDFDocument({
+    size: [width, height],
+    margins: {
+      top: mmToPoints(5),
+      bottom: mmToPoints(5),
+      left: mmToPoints(5),
+      right: mmToPoints(5)
+    }
+  });
+  
+  const stream = fs.createWriteStream(tempPath);
+  doc.pipe(stream);
+  
+  // 注册中文字体（需要您提供中文字体文件）
+  // 如果没有中文字体，可以使用系统字体或下载开源字体
+  try {
+    // Windows系统字体路径
+    if (process.platform === 'win32') {
+      const fontPath = 'C:/Windows/Fonts/simhei.ttf';
+      if (fs.existsSync(fontPath)) {
+        doc.registerFont('Chinese', fontPath);
+      }
+    }
+  } catch (e) {
+    console.log('Font registration failed:', e);
+  }
+  
+  // 可用区域
+  const contentWidth = width - mmToPoints(10);
+  const contentHeight = height - mmToPoints(10);
+  let currentY = mmToPoints(5);
+  
+  // 设置字体
+  const fontSize = Math.min(12, contentWidth / 20);
+  doc.fontSize(fontSize);
+  
+  // 如果品名要独立显示在顶部
+  if (settings.showProductNameOnTop && labelData.productName) {
+    doc.font('Chinese').fontSize(fontSize * 1.5)
+       .text(labelData.productName, mmToPoints(5), currentY, {
+         width: contentWidth,
+         align: 'center'
+       });
+    currentY += fontSize * 2;
+  }
+  
+  // 显示各个字段
+  const fields = [
+    { key: 'productName', label: '品名' },
+    { key: 'ingredients', label: '配料' },
+    { key: 'standardNo', label: '产品标准号' },
+    { key: 'licenseNo', label: '生产许可证号' },
+    { key: 'shelfLife', label: '保质期' },
+    { key: 'productionDate', label: '生产日期' },
+    { key: 'expiryDate', label: '保质期至' },
+    { key: 'storageCondition', label: '贮存条件' },
+    { key: 'netContent', label: '净含量' },
+    { key: 'boxSpec', label: '箱规' },
+    { key: 'origin', label: '产地' },
+    { key: 'usage', label: '食用方法' },
+    { key: 'manufacturer', label: '生产商' },
+    { key: 'phone', label: '联系电话' },
+    { key: 'address', label: '地址' },
+    { key: 'allergen', label: '致敏物质提示' },
+    { key: 'tips', label: '温馨提示' }
+  ];
+  
+  doc.fontSize(fontSize);
+  
+  for (const field of fields) {
+    if (labelData[field.key]) {
+      // 跳过已经在顶部显示的品名
+      if (settings.showProductNameOnTop && field.key === 'productName') {
+        continue;
+      }
+      
+      const text = `${field.label}：${labelData[field.key]}`;
+      const lines = doc.heightOfString(text, { width: contentWidth });
+      
+      // 检查是否超出页面
+      if (currentY + lines > height - mmToPoints(5)) {
+        break;
+      }
+      
+      doc.font('Chinese').text(text, mmToPoints(5), currentY, {
+        width: contentWidth,
+        align: 'left'
+      });
+      currentY += lines + 2;
+    }
+  }
+  
+  // 显示额外字段
+  if (labelData.extraFields && labelData.extraFields.length > 0) {
+    for (const field of labelData.extraFields) {
+      if (field.label && field.value) {
+        const text = `${field.label}：${field.value}`;
+        const lines = doc.heightOfString(text, { width: contentWidth });
+        
+        if (currentY + lines > height - mmToPoints(5)) {
+          break;
+        }
+        
+        doc.font('Chinese').text(text, mmToPoints(5), currentY, {
+          width: contentWidth,
+          align: 'left'
+        });
+        currentY += lines + 2;
+      }
+    }
+  }
+  
+  // 如果有营养成分表图片
+  if (labelData.nutritionImage) {
+    try {
+      const remainingHeight = height - mmToPoints(5) - currentY;
+      const imageHeight = Math.min(remainingHeight, contentWidth * 0.8);
+      
+      if (imageHeight > 20) {
+        // 将base64转换为buffer
+        const imageBuffer = Buffer.from(labelData.nutritionImage.split(',')[1], 'base64');
+        doc.image(imageBuffer, mmToPoints(5), currentY, {
+          width: contentWidth,
+          height: imageHeight,
+          fit: [contentWidth, imageHeight]
+        });
+      }
+    } catch (e) {
+      console.error('Failed to add nutrition image:', e);
+    }
+  }
+  
+  doc.end();
+  
+  return new Promise((resolve) => {
+    stream.on('finish', () => {
+      resolve(tempPath);
+    });
+  });
+});
+
+// 打印PDF - 方案一：使用pdf-to-printer（推荐）
+ipcMain.handle('print-pdf', async (event, pdfPath, printerName, copies) => {
+  try {
+    // 根据操作系统选择打印方式
+    if (process.platform === 'win32') {
+      // Windows: 使用 pdf-to-printer
+      const ptp = require('pdf-to-printer');
+      
+       // 一次性打印多份（pdf-to-printer支持copies参数）
+      const options = {
+        printer: printerName,
+        copies: copies || 1,
+        silent: true
+      };
+      
+      await ptp.print(pdfPath, options);
+      
+      return { success: true };
+    } else {
+      // macOS/Linux: 使用命令行
+      const { exec } = require('child_process');
+      const util = require('util');
+      const execPromise = util.promisify(exec);
+      
+      let command;
+      if (process.platform === 'darwin') {
+        // macOS
+        command = `lpr -P "${printerName}" -# ${copies || 1} "${pdfPath}"`;
+      } else {
+        // Linux
+        command = `lp -d "${printerName}" -n ${copies || 1} "${pdfPath}"`;
+      }
+      
+      await execPromise(command);
+      return { success: true };
+    }
+  } catch (error) {
+    console.error('Print error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// 打开PDF预览
+ipcMain.handle('preview-pdf', async (event, pdfPath) => {
+  shell.openPath(pdfPath);
+  return true;
+});
+</file>
+
+<file path="package.json">
+{
+  "name": "label-printer",
+  "version": "1.0.0",
+  "description": "食品标签打印器",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "dist": "electron-builder --publish=never"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "dependencies": {
+    "electron-store": "^8.1.0",
+    "pdf-to-printer": "^5.6.0",
+    "pdfkit": "^0.14.0"
+  },
+  "build": {
+    "appId": "com.yourcompany.labelprinter",
+    "productName": "标签打印器",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.icns"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png"
+    }
+  }
+}
+</file>
+
+<file path="preload.js">
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('electronAPI', {
+  // 打印机相关
+  getPrinters: () => ipcRenderer.invoke('get-printers'),
+  printPDF: (pdfPath, printerName, copies) => 
+    ipcRenderer.invoke('print-pdf', pdfPath, printerName, copies),
+  
+  // PDF相关
+  generatePDF: (labelData, settings) => 
+    ipcRenderer.invoke('generate-pdf', labelData, settings),
+  previewPDF: (pdfPath) => ipcRenderer.invoke('preview-pdf', pdfPath),
+  
+  // 数据存储
+  saveData: (key, value) => ipcRenderer.invoke('save-data', key, value),
+  getData: (key) => ipcRenderer.invoke('get-data', key),
+  deleteData: (key) => ipcRenderer.invoke('delete-data', key),
+  getAllLabels: () => ipcRenderer.invoke('get-all-labels'),
+  
+  // 导入导出
+  exportLabels: () => ipcRenderer.invoke('export-labels'),
+  importLabels: () => ipcRenderer.invoke('import-labels')
+});
+</file>
+
+<file path="renderer.js">
+// 全局变量
+let labels = [];
+let currentLabel = null;
+let inputHistory = {};
+let currentPdfPath = null;
+
+// 初始化
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadLabels();
+    await loadPrinters();
+    loadInputHistory();
+    setupEventListeners();
+    setupInputMemory();
+    
+    // 设置今天的日期为默认生产日期
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('productionDate').value = today;
+});
+
+// 加载标签列表
+async function loadLabels() {
+    labels = await window.electronAPI.getAllLabels() || [];
+    renderLabelList();
+}
+
+// 渲染标签列表
+function renderLabelList() {
+    const labelList = document.getElementById('labelList');
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    
+    // 按品名排序
+    const sortedLabels = [...labels].sort((a, b) => 
+        (a.productName || '').localeCompare(b.productName || '', 'zh-CN')
+    );
+    
+    // 过滤搜索结果
+    const filteredLabels = sortedLabels.filter(label => 
+        (label.productName || '').toLowerCase().includes(searchTerm)
+    );
+    
+    labelList.innerHTML = '';
+    
+    filteredLabels.forEach((label, index) => {
+        const item = document.createElement('div');
+        item.className = 'label-item';
+        item.dataset.id = label.id;
+        
+        if (currentLabel && currentLabel.id === label.id) {
+            item.classList.add('active');
+        }
+        
+        item.innerHTML = `
+            <div class="label-item-name">${label.productName || '未命名标签'}</div>
+            <div class="label-item-info">${label.manufacturer || ''} ${label.netContent || ''}</div>
+        `;
+        
+        item.addEventListener('click', () => selectLabel(label));
+        labelList.appendChild(item);
+    });
+}
+
+// 选择标签
+function selectLabel(label) {
+    currentLabel = label;
+    
+    // 更新列表选中状态
+    document.querySelectorAll('.label-item').forEach(item => {
+        item.classList.remove('active');
+        if (item.dataset.id === label.id) {
+            item.classList.add('active');
+        }
+    });
+    
+    // 显示编辑器视图
+    document.getElementById('welcomeView').style.display = 'none';
+    document.getElementById('editorView').style.display = 'flex';
+    
+    // 填充表单
+    fillForm(label);
+    
+    // 加载该标签的打印设置
+    loadLabelSettings(label.id);
+    
+    // 清空预览
+    document.getElementById('previewContent').innerHTML = '<p>点击预览按钮查看标签效果</p>';
+}
+
+// 填充表单
+function fillForm(label) {
+    document.getElementById('productName').value = label.productName || '';
+    document.getElementById('ingredients').value = label.ingredients || '';
+    document.getElementById('standardNo').value = label.standardNo || '';
+    document.getElementById('licenseNo').value = label.licenseNo || '';
+    document.getElementById('netContent').value = label.netContent || '';
+    document.getElementById('boxSpec').value = label.boxSpec || '';
+    document.getElementById('origin').value = label.origin || '';
+    document.getElementById('usage').value = label.usage || '';
+    document.getElementById('manufacturer').value = label.manufacturer || '';
+    document.getElementById('phone').value = label.phone || '';
+    document.getElementById('address').value = label.address || '';
+    document.getElementById('allergen').value = label.allergen || '';
+    document.getElementById('tips').value = label.tips || '';
+    
+    // 保质期类型
+    document.getElementById('shelfLifeType').value = label.shelfLifeType || 'normal';
+    updateShelfLifeInputs();
+    
+    if (label.normalDays) {
+        document.getElementById('normalDays').value = label.normalDays;
+    }
+    if (label.frozenDays) {
+        document.getElementById('frozenDays').value = label.frozenDays;
+    }
+    
+    // 营养成分表图片
+    if (label.nutritionImage) {
+        const preview = document.getElementById('nutritionPreview');
+        preview.innerHTML = `<img src="${label.nutritionImage}" alt="营养成分表">`;
+    } else {
+        document.getElementById('nutritionPreview').innerHTML = '';
+    }
+    
+    // 额外字段
+    renderExtraFields(label.extraFields || []);
+}
+
+// 渲染额外字段
+function renderExtraFields(fields) {
+    const container = document.getElementById('extraFields');
+    container.innerHTML = '';
+    
+    fields.forEach((field, index) => {
+        const div = document.createElement('div');
+        div.className = 'extra-field';
+        div.innerHTML = `
+            <input type="text" placeholder="字段名称" value="${field.label || ''}" data-field="label">
+            <input type="text" placeholder="字段值" value="${field.value || ''}" data-field="value">
+            <button type="button" class="btn btn-small" onclick="removeExtraField(${index})">删除</button>
+        `;
+        container.appendChild(div);
+    });
+}
+
+// 添加额外字段
+function addExtraField() {
+    const container = document.getElementById('extraFields');
+    const div = document.createElement('div');
+    div.className = 'extra-field';
+    div.innerHTML = `
+        <input type="text" placeholder="字段名称" data-field="label">
+        <input type="text" placeholder="字段值" data-field="value">
+        <button type="button" class="btn btn-small" onclick="removeExtraField(this)">删除</button>
+    `;
+    container.appendChild(div);
+}
+
+// 删除额外字段
+function removeExtraField(indexOrElement) {
+    if (typeof indexOrElement === 'number') {
+        renderExtraFields(getExtraFields().filter((_, i) => i !== indexOrElement));
+    } else {
+        indexOrElement.parentElement.remove();
+    }
+}
+
+// 获取额外字段数据
+function getExtraFields() {
+    const fields = [];
+    document.querySelectorAll('#extraFields .extra-field').forEach(field => {
+        const label = field.querySelector('[data-field="label"]').value;
+        const value = field.querySelector('[data-field="value"]').value;
+        if (label || value) {
+            fields.push({ label, value });
+        }
+    });
+    return fields;
+}
+
+// 设置事件监听器
+function setupEventListeners() {
+    // 搜索
+    document.getElementById('searchInput').addEventListener('input', renderLabelList);
+    
+    // 新增标签
+    document.getElementById('addLabelBtn').addEventListener('click', createNewLabel);
+    
+    // 导入导出
+    document.getElementById('importBtn').addEventListener('click', importLabels);
+    document.getElementById('exportBtn').addEventListener('click', exportLabels);
+    
+    // 保质期类型变化
+    document.getElementById('shelfLifeType').addEventListener('change', updateShelfLifeInputs);
+    
+    // 纸张大小变化
+    document.getElementById('paperSize').addEventListener('change', (e) => {
+        const customInputs = document.getElementById('customSizeInputs');
+        customInputs.style.display = e.target.value === 'custom' ? 'flex' : 'none';
+    });
+    
+    // 营养成分表上传
+    document.getElementById('nutritionImage').addEventListener('change', handleImageUpload);
+    
+    // 表单提交
+    document.getElementById('labelForm').addEventListener('submit', saveLabel);
+    
+    // 删除标签
+    document.getElementById('deleteLabelBtn').addEventListener('click', deleteCurrentLabel);
+    
+    // 添加额外字段
+    document.getElementById('addExtraFieldBtn').addEventListener('click', addExtraField);
+    
+    // 预览和打印
+    document.getElementById('previewBtn').addEventListener('click', previewLabel);
+    document.getElementById('printBtn').addEventListener('click', printLabel);
+    
+    // 生产日期变化时更新保质期至
+    document.getElementById('productionDate').addEventListener('change', updateExpiryDate);
+}
+
+// 更新保质期输入框
+function updateShelfLifeInputs() {
+    const type = document.getElementById('shelfLifeType').value;
+    const normalDays = document.getElementById('normalDays');
+    const frozenDays = document.getElementById('frozenDays');
+    
+    switch(type) {
+        case 'dual':
+            normalDays.style.display = 'block';
+            frozenDays.style.display = 'block';
+            normalDays.placeholder = '常温天数';
+            break;
+        case 'frozen':
+            normalDays.style.display = 'none';
+            frozenDays.style.display = 'block';
+            frozenDays.placeholder = '冷冻天数';
+            break;
+        default:
+            normalDays.style.display = 'block';
+            frozenDays.style.display = 'none';
+            normalDays.placeholder = '保质天数';
+    }
+}
+
+// 处理图片上传
+function handleImageUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        const preview = document.getElementById('nutritionPreview');
+        preview.innerHTML = `<img src="${event.target.result}" alt="营养成分表">`;
+        
+        // 保存到当前标签
+        if (currentLabel) {
+            currentLabel.nutritionImage = event.target.result;
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+// 创建新标签
+function createNewLabel() {
+    const label = {
+        id: Date.now().toString(),
+        productName: '新标签',
+        createdAt: new Date().toISOString()
+    };
+    
+    labels.push(label);
+    saveLabelsToStorage();
+    renderLabelList();
+    selectLabel(label);
+}
+
+// 保存标签
+async function saveLabel(e) {
+    e.preventDefault();
+    
+    if (!currentLabel) return;
+    
+    // 收集表单数据
+    currentLabel.productName = document.getElementById('productName').value;
+    currentLabel.ingredients = document.getElementById('ingredients').value;
+    currentLabel.standardNo = document.getElementById('standardNo').value;
+    currentLabel.licenseNo = document.getElementById('licenseNo').value;
+    currentLabel.shelfLifeType = document.getElementById('shelfLifeType').value;
+    currentLabel.normalDays = document.getElementById('normalDays').value;
+    currentLabel.frozenDays = document.getElementById('frozenDays').value;
+    currentLabel.netContent = document.getElementById('netContent').value;
+    currentLabel.boxSpec = document.getElementById('boxSpec').value;
+    currentLabel.origin = document.getElementById('origin').value;
+    currentLabel.usage = document.getElementById('usage').value;
+    currentLabel.manufacturer = document.getElementById('manufacturer').value;
+    currentLabel.phone = document.getElementById('phone').value;
+    currentLabel.address = document.getElementById('address').value;
+    currentLabel.allergen = document.getElementById('allergen').value;
+    currentLabel.tips = document.getElementById('tips').value;
+    currentLabel.extraFields = getExtraFields();
+    
+    // 更新保质期和贮存条件文本
+    currentLabel.shelfLife = generateShelfLifeText(currentLabel);
+    currentLabel.storageCondition = generateStorageCondition(currentLabel);
+    
+    // 保存到存储
+    saveLabelsToStorage();
+    renderLabelList();
+    
+    // 保存输入历史
+    saveInputHistory();
+    
+    alert('标签保存成功！');
+}
+
+// 生成保质期文本
+function generateShelfLifeText(label) {
+    const type = label.shelfLifeType;
+    const normal = label.normalDays;
+    const frozen = label.frozenDays;
+    
+    switch(type) {
+        case 'normalWithCold':
+            return `常温${normal}天，开封后需冷藏`;
+        case 'normalWithFrozen':
+            return `常温${normal}天，开封后需冷冻`;
+        case 'frozen':
+            return `冷冻${frozen}天`;
+        case 'dual':
+            return `常温${normal}天，冷冻${frozen}天`;
+        default:
+            return `${normal}天`;
+    }
+}
+
+// 生成贮存条件
+function generateStorageCondition(label) {
+    const type = label.shelfLifeType;
+    
+    switch(type) {
+        case 'normalWithCold':
+            return '常温保存，开封后需冷藏';
+        case 'normalWithFrozen':
+            return '常温保存，开封后需冷冻';
+        case 'frozen':
+            return '冷冻保存（≤-18℃）';
+        case 'dual':
+            return '常温保存或冷冻保存（≤-18℃）';
+        default:
+            return '常温保存，避免阳光直射';
+    }
+}
+
+// 删除当前标签
+async function deleteCurrentLabel() {
+    if (!currentLabel) return;
+    
+    if (!window.confirm(`确定要删除标签"${currentLabel.productName}"吗？`)) {
+        return;
+    }
+    
+    labels = labels.filter(l => l.id !== currentLabel.id);
+    saveLabelsToStorage();
+    
+    currentLabel = null;
+    document.getElementById('welcomeView').style.display = 'flex';
+    document.getElementById('editorView').style.display = 'none';
+    
+    renderLabelList();
+}
+
+// 保存标签到存储
+async function saveLabelsToStorage() {
+    await window.electronAPI.saveData('labels', labels);
+}
+
+// 加载打印机列表
+async function loadPrinters() {
+    const printers = await window.electronAPI.getPrinters();
+    const select = document.getElementById('printerSelect');
+    
+    select.innerHTML = '<option value="">选择打印机...</option>';
+    printers.forEach(printer => {
+        const option = document.createElement('option');
+        option.value = printer.name;
+        option.textContent = printer.displayName || printer.name;
+        if (printer.isDefault) {
+            option.selected = true;
+        }
+        select.appendChild(option);
+    });
+}
+
+// 加载标签设置
+async function loadLabelSettings(labelId) {
+    const settings = await window.electronAPI.getData(`labelSettings_${labelId}`) || {};
+    
+    if (settings.paperSize) {
+        document.getElementById('paperSize').value = settings.paperSize;
+        if (settings.paperSize === 'custom') {
+            document.getElementById('customSizeInputs').style.display = 'flex';
+            document.getElementById('customWidth').value = settings.customWidth || '';
+            document.getElementById('customHeight').value = settings.customHeight || '';
+        }
+    }
+    
+    if (settings.showProductNameOnTop !== undefined) {
+        document.getElementById('showProductNameOnTop').checked = settings.showProductNameOnTop;
+    }
+    
+    // 加载上次的生产日期
+    const lastProductionDate = await window.electronAPI.getData('lastProductionDate');
+    if (lastProductionDate) {
+        document.getElementById('productionDate').value = lastProductionDate;
+    }
+}
+
+// 保存标签设置
+async function saveLabelSettings() {
+    if (!currentLabel) return;
+    
+    const settings = {
+        paperSize: document.getElementById('paperSize').value,
+        customWidth: document.getElementById('customWidth').value,
+        customHeight: document.getElementById('customHeight').value,
+        showProductNameOnTop: document.getElementById('showProductNameOnTop').checked
+    };
+    
+    await window.electronAPI.saveData(`labelSettings_${currentLabel.id}`, settings);
+    
+    // 保存生产日期
+    const productionDate = document.getElementById('productionDate').value;
+    if (productionDate) {
+        await window.electronAPI.saveData('lastProductionDate', productionDate);
+    }
+}
+
+// 更新保质期至日期
+function updateExpiryDate() {
+    if (!currentLabel) return;
+    
+    const productionDate = document.getElementById('productionDate').value;
+    if (!productionDate) return;
+    
+    const date = new Date(productionDate);
+    let expiryText = '';
+    
+    const type = currentLabel.shelfLifeType;
+    const normal = parseInt(currentLabel.normalDays);
+    const frozen = parseInt(currentLabel.frozenDays);
+    
+    if (type === 'dual' && normal && frozen) {
+        const normalExpiry = new Date(date);
+        normalExpiry.setDate(normalExpiry.getDate() + normal);
+        const frozenExpiry = new Date(date);
+        frozenExpiry.setDate(frozenExpiry.getDate() + frozen);
+        
+        expiryText = `常温${formatDate(normalExpiry)}，冷冻${formatDate(frozenExpiry)}`;
+    } else if (type === 'frozen' && frozen) {
+        const expiry = new Date(date);
+        expiry.setDate(expiry.getDate() + frozen);
+        expiryText = formatDate(expiry);
+    } else if (normal) {
+        const expiry = new Date(date);
+        expiry.setDate(expiry.getDate() + normal);
+        expiryText = formatDate(expiry);
+    }
+    
+    currentLabel.expiryDate = expiryText;
+    return expiryText;
+}
+
+// 格式化日期
+function formatDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}年${month}月${day}日`;
+}
+
+// 预览标签
+async function previewLabel() {
+    if (!currentLabel) {
+        alert('请先选择一个标签');
+        return;
+    }
+    
+    const productionDate = document.getElementById('productionDate').value;
+    if (!productionDate) {
+        alert('请输入生产日期');
+        return;
+    }
+    
+    // 保存设置
+    await saveLabelSettings();
+    
+    // 准备标签数据
+    const labelData = {
+        ...currentLabel,
+        productionDate: formatDate(new Date(productionDate)),
+        expiryDate: updateExpiryDate()
+    };
+    
+    // 获取打印设置
+    const settings = {
+        paperSize: document.getElementById('paperSize').value,
+        customWidth: document.getElementById('customWidth').value,
+        customHeight: document.getElementById('customHeight').value,
+        showProductNameOnTop: document.getElementById('showProductNameOnTop').checked
+    };
+    
+    // 生成PDF
+    currentPdfPath = await window.electronAPI.generatePDF(labelData, settings);
+    
+    // 显示预览内容
+    const previewContent = document.getElementById('previewContent');
+    previewContent.innerHTML = generatePreviewHTML(labelData, settings);
+    
+    // 可选：打开PDF预览
+    // await window.electronAPI.previewPDF(currentPdfPath);
+}
+
+// 生成预览HTML
+function generatePreviewHTML(labelData, settings) {
+    let html = '';
+    
+    if (settings.showProductNameOnTop && labelData.productName) {
+        html += `<div style="text-align:center;font-size:16px;font-weight:bold;margin-bottom:10px;">${labelData.productName}</div>`;
+    }
+    
+    const fields = [
+        { key: 'productName', label: '品名' },
+        { key: 'ingredients', label: '配料' },
+        { key: 'standardNo', label: '产品标准号' },
+        { key: 'licenseNo', label: '生产许可证号' },
+        { key: 'shelfLife', label: '保质期' },
+        { key: 'productionDate', label: '生产日期' },
+        { key: 'expiryDate', label: '保质期至' },
+        { key: 'storageCondition', label: '贮存条件' },
+        { key: 'netContent', label: '净含量' },
+        { key: 'boxSpec', label: '箱规' },
+        { key: 'origin', label: '产地' },
+        { key: 'usage', label: '食用方法' },
+        { key: 'manufacturer', label: '生产商' },
+        { key: 'phone', label: '联系电话' },
+        { key: 'address', label: '地址' },
+        { key: 'allergen', label: '致敏物质提示' },
+        { key: 'tips', label: '温馨提示' }
+    ];
+    
+    fields.forEach(field => {
+        if (labelData[field.key]) {
+            if (settings.showProductNameOnTop && field.key === 'productName') {
+                return;
+            }
+            html += `<div><strong>${field.label}：</strong>${labelData[field.key]}</div>`;
+        }
+    });
+    
+    // 额外字段
+    if (labelData.extraFields && labelData.extraFields.length > 0) {
+        labelData.extraFields.forEach(field => {
+            if (field.label && field.value) {
+                html += `<div><strong>${field.label}：</strong>${field.value}</div>`;
+            }
+        });
+    }
+    
+    // 营养成分表
+    if (labelData.nutritionImage) {
+        html += `<div style="margin-top:10px;"><img src="${labelData.nutritionImage}" style="max-width:100%;"></div>`;
+    }
+    
+    return html;
+}
+
+// 打印标签
+async function printLabel() {
+    if (!currentLabel) {
+        alert('请先选择一个标签');
+        return;
+    }
+    
+    const productionDate = document.getElementById('productionDate').value;
+    if (!productionDate) {
+        alert('请输入生产日期');
+        return;
+    }
+    
+    const printer = document.getElementById('printerSelect').value;
+    if (!printer) {
+        alert('请选择打印机');
+        return;
+    }
+    
+    const copies = parseInt(document.getElementById('printCopies').value) || 1;
+    
+    // 如果还没有生成PDF，先生成
+    if (!currentPdfPath) {
+        await previewLabel();
+    }
+    
+    // 打印
+    const result = await window.electronAPI.printPDF(currentPdfPath, printer, copies);
+    
+    if (result.success) {
+        alert(`成功发送到打印机，共${copies}份`);
+    } else {
+        alert(`打印失败：${result.error || '未知错误'}`);
+    }
+}
+
+// 导入标签
+async function importLabels() {
+    const imported = await window.electronAPI.importLabels();
+    if (imported) {
+        labels = imported;
+        renderLabelList();
+        alert('导入成功！');
+    }
+}
+
+// 导出标签
+async function exportLabels() {
+    const success = await window.electronAPI.exportLabels();
+    if (success) {
+        alert('导出成功！');
+    }
+}
+
+// 输入记忆功能
+function setupInputMemory() {
+    const inputs = document.querySelectorAll('input[type="text"], textarea');
+    
+    inputs.forEach(input => {
+        // 获取输入历史
+        input.addEventListener('focus', (e) => {
+            showSuggestions(e.target);
+        });
+        
+        // 更新输入历史
+        input.addEventListener('blur', (e) => {
+            updateInputHistory(e.target.id, e.target.value);
+            hideSuggestions();
+        });
+        
+        // 键盘导航
+        input.addEventListener('keydown', (e) => {
+            handleSuggestionNavigation(e);
+        });
+    });
+}
+
+// 显示建议列表
+function showSuggestions(input) {
+    const fieldId = input.id;
+    const history = inputHistory[fieldId] || [];
+    const currentValue = input.value.toLowerCase();
+    
+    const filtered = history.filter(item => 
+        item.toLowerCase().includes(currentValue)
+    );
+    
+    if (filtered.length === 0) return;
+    
+    const suggestionList = document.getElementById('suggestionList');
+    suggestionList.innerHTML = '';
+    
+    filtered.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'suggestion-item';
+        div.textContent = item;
+        div.dataset.index = index;
+        
+        div.addEventListener('click', () => {
+            input.value = item;
+            hideSuggestions();
+        });
+        
+        suggestionList.appendChild(div);
+    });
+    
+    // 定位建议列表
+    const rect = input.getBoundingClientRect();
+    suggestionList.style.left = rect.left + 'px';
+    suggestionList.style.top = (rect.bottom + 2) + 'px';
+    suggestionList.style.width = rect.width + 'px';
+    suggestionList.style.display = 'block';
+}
+
+// 隐藏建议列表
+function hideSuggestions() {
+    setTimeout(() => {
+        document.getElementById('suggestionList').style.display = 'none';
+    }, 200);
+}
+
+// 处理建议列表键盘导航
+function handleSuggestionNavigation(e) {
+    const suggestionList = document.getElementById('suggestionList');
+    if (suggestionList.style.display === 'none') return;
+    
+    const items = suggestionList.querySelectorAll('.suggestion-item');
+    if (items.length === 0) return;
+    
+    const selected = suggestionList.querySelector('.selected');
+    let index = selected ? parseInt(selected.dataset.index) : -1;
+    
+    switch(e.key) {
+        case 'ArrowDown':
+            e.preventDefault();
+            index = (index + 1) % items.length;
+            break;
+        case 'ArrowUp':
+            e.preventDefault();
+            index = index <= 0 ? items.length - 1 : index - 1;
+            break;
+        case 'Enter':
+            if (selected) {
+                e.preventDefault();
+                e.target.value = selected.textContent;
+                hideSuggestions();
+            }
+            return;
+        case 'Escape':
+            hideSuggestions();
+            return;
+        default:
+            return;
+    }
+    
+    items.forEach(item => item.classList.remove('selected'));
+    if (items[index]) {
+        items[index].classList.add('selected');
+    }
+}
+
+// 加载输入历史
+async function loadInputHistory() {
+    inputHistory = await window.electronAPI.getData('inputHistory') || {};
+}
+
+// 保存输入历史
+async function saveInputHistory() {
+    await window.electronAPI.saveData('inputHistory', inputHistory);
+}
+
+// 更新输入历史
+function updateInputHistory(fieldId, value) {
+    if (!value || !fieldId) return;
+    
+    if (!inputHistory[fieldId]) {
+        inputHistory[fieldId] = [];
+    }
+    
+    // 移除重复项
+    inputHistory[fieldId] = inputHistory[fieldId].filter(item => item !== value);
+    
+    // 添加到开头
+    inputHistory[fieldId].unshift(value);
+    
+    // 限制历史记录数量
+    if (inputHistory[fieldId].length > 10) {
+        inputHistory[fieldId] = inputHistory[fieldId].slice(0, 10);
+    }
+    
+    saveInputHistory();
+}
+</file>
+
+<file path="repomix.config.json">
+{
+  "output": {
+    "filePath": "repomix-output.txt",
+    "style": "xml",
+    "parsableStyle": false,
+    "fileSummary": true,
+    "directoryStructure": true,
+    "removeComments": false,
+    "removeEmptyLines": false,
+    "compress": false,
+    "topFilesLength": 5,
+    "showLineNumbers": false,
+    "copyToClipboard": false,
+    "git": {
+      "sortByChanges": true,
+      "sortByChangesMaxCommits": 100
+    }
+  },
+  "include": [],
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": []
+  },
+  "security": {
+    "enableSecurityCheck": true
+  },
+  "tokenCount": {
+    "encoding": "o200k_base"
+  }
+}
+</file>
+
+<file path="style.css">
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    background: #f5f5f5;
+    color: #333;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.container {
+    display: flex;
+    height: 100vh;
+}
+
+/* 左侧边栏 */
+.sidebar {
+    width: 300px;
+    background: white;
+    border-right: 1px solid #e0e0e0;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-header {
+    padding: 20px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.sidebar-header h2 {
+    margin-bottom: 15px;
+    font-size: 20px;
+}
+
+.sidebar-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.search-box {
+    padding: 15px 20px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.search-box input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.label-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+.label-item {
+    padding: 12px 15px;
+    margin-bottom: 5px;
+    background: #f8f8f8;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.label-item:hover {
+    background: #e8e8e8;
+}
+
+.label-item.active {
+    background: #007bff;
+    color: white;
+}
+
+.label-item-name {
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+
+.label-item-info {
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+/* 主内容区 */
+.main-content {
+    flex: 1;
+    display: flex;
+    background: white;
+}
+
+.welcome-view {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 40px;
+}
+
+.welcome-view h2 {
+    margin-bottom: 20px;
+    font-size: 28px;
+    color: #555;
+}
+
+.welcome-view p {
+    font-size: 16px;
+    color: #888;
+}
+
+.editor-view {
+    flex: 1;
+    display: flex;
+    height: 100vh;
+}
+
+/* 编辑面板 */
+.editor-panel {
+    flex: 1;
+    padding: 30px;
+    overflow-y: auto;
+    border-right: 1px solid #e0e0e0;
+}
+
+.editor-panel h3 {
+    margin-bottom: 20px;
+    font-size: 18px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group input[type="date"],
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.form-group textarea {
+    resize: vertical;
+}
+
+.form-group input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+.shelf-life-inputs {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.shelf-life-inputs input {
+    flex: 1;
+}
+
+.image-preview {
+    margin-top: 10px;
+    max-width: 300px;
+}
+
+.image-preview img {
+    max-width: 100%;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+/* 额外字段 */
+.extra-field {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.extra-field input {
+    flex: 1;
+}
+
+.extra-field button {
+    padding: 5px 10px;
+}
+
+/* 预览面板 */
+.preview-panel {
+    width: 400px;
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+}
+
+.preview-panel h3 {
+    margin-bottom: 20px;
+    font-size: 18px;
+}
+
+.print-settings {
+    margin-bottom: 30px;
+}
+
+#customSizeInputs {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+#customSizeInputs input {
+    flex: 1;
+}
+
+.print-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.print-actions button {
+    flex: 1;
+}
+
+.preview-area {
+    flex: 1;
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    background: #fafafa;
+    overflow: auto;
+}
+
+.preview-area h4 {
+    margin-bottom: 15px;
+    font-size: 16px;
+    text-align: center;
+}
+
+.preview-content {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+    min-height: 300px;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.preview-content p {
+    text-align: center;
+    color: #999;
+    margin-top: 100px;
+}
+
+/* 按钮样式 */
+.btn {
+    padding: 8px 16px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    color: #333;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn:hover {
+    background: #f8f8f8;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: white;
+    border-color: #dc3545;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+}
+
+.btn-small {
+    padding: 5px 10px;
+    font-size: 12px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #e0e0e0;
+}
+
+/* 输入建议列表 */
+.suggestion-list {
+    position: absolute;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+}
+
+.suggestion-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.suggestion-item:hover {
+    background: #f0f0f0;
+}
+
+.suggestion-item.selected {
+    background: #007bff;
+    color: white;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* 响应式调整 */
+@media (max-width: 1200px) {
+    .preview-panel {
+        width: 350px;
+    }
+}
+
+@media (max-width: 1000px) {
+    .sidebar {
+        width: 250px;
+    }
+}
+</file>
+
+</files>
