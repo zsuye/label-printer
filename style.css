@@ -380,16 +380,21 @@ body {
 
 /* 小纸张预览样式 */
 .preview-content-small {
-    font-size: 10px !important;
-    line-height: 1.3 !important;
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+    overflow-wrap: break-word !important;
+    word-wrap: break-word !important;
+    word-break: break-word !important;
 }
 
 .preview-content-small strong {
     font-weight: 600;
 }
 
-.preview-content-small div {
-    margin-bottom: 2px;
+.preview-content-small > div {
+    margin: 0;
+    padding: 0;
+    line-height: inherit;
 }
 
 .preview-content-small span {

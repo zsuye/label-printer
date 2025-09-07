@@ -624,81 +624,49 @@ function generatePreviewHTML(labelData, settings) {
     ];
     
     if (isSmallPaper) {
-        // 小纸张：紧凑布局
-        let lineBuffer = [];
-        const longFields = ['ingredients', 'address', 'usage', 'tips', 'allergen'];
-        
-        html += '<div style="word-wrap:break-word;word-break:break-all;">';
-        
-        for (const field of fields) {
-            if (labelData[field.key]) {
-                // 跳过已经在顶部显示的品名
-                if (settings.showProductNameOnTop && field.key === 'productName') {
-                    continue;
+          // 小纸张：完全不分行的连续文本流布局
+    html += '<div style="word-wrap:break-word;word-break:break-word;">';
+    
+    let fullText = '';
+    const separator = '&nbsp;&nbsp;'; // 两个不换行空格分隔
+    
+    for (const field of fields) {
+        if (labelData[field.key]) {
+            // 跳过已经在顶部显示的品名
+            if (settings.showProductNameOnTop && field.key === 'productName') {
+                continue;
+            }
+            
+            if (fullText) {
+                fullText += separator;
+            }
+            fullText += `<strong>${field.label}：</strong>${labelData[field.key]}`;
+        }
+    }
+    
+    // 额外字段也加入连续文本流
+    if (labelData.extraFields && labelData.extraFields.length > 0) {
+        for (const field of labelData.extraFields) {
+            if (field.label && field.value) {
+                if (fullText) {
+                    fullText += separator;
                 }
-                
-                const fieldContent = `<span><strong>${field.label}：</strong>${labelData[field.key]}</span>`;
-                
-                // 长文本字段独占一行
-                if (longFields.includes(field.key)) {
-                    // 先输出缓冲区内容
-                    if (lineBuffer.length > 0) {
-                        html += '<div>' + lineBuffer.join('&nbsp;&nbsp;') + '</div>';
-                        lineBuffer = [];
-                    }
-                    // 输出长文本字段
-                    html += `<div>${fieldContent}</div>`;
-                } else {
-                    // 短字段添加到缓冲区
-                    lineBuffer.push(fieldContent);
-                    
-                    // 每3个短字段换行（可根据实际宽度调整）
-                    if (lineBuffer.length >= 2 || 
-                        // 某些字段后强制换行
-                        ['expiryDate', 'storageCondition', 'phone'].includes(field.key)) {
-                        html += '<div>' + lineBuffer.join('&nbsp;&nbsp;') + '</div>';
-                        lineBuffer = [];
-                    }
-                }
+                fullText += `<strong>${field.label}：</strong>${field.value}`;
             }
         }
-        
-        // 输出剩余的缓冲区内容
-        if (lineBuffer.length > 0) {
-            html += '<div style="margin-bottom:2px;">' + lineBuffer.join('&nbsp;&nbsp;') + '</div>';
-        }
-        
-        // 额外字段也采用紧凑布局（同样需要防溢出）
-        if (labelData.extraFields && labelData.extraFields.length > 0) {
-            lineBuffer = [];
-            for (const field of labelData.extraFields) {
-                if (field.label && field.value) {
-                    let value = field.value;
-                    // 截断超长的额外字段值
-                    if (value.length > 50) {
-                        value = value.substring(0, 47) + '...';
-                    }
-                    lineBuffer.push(`<span><strong>${field.label}：</strong>${value}</span>`);
-                    if (lineBuffer.length >= 2) {
-                        html += '<div style="margin-bottom:2px;">' + lineBuffer.join('&nbsp;&nbsp;') + '</div>';
-                        lineBuffer = [];
-                    }
-                }
-            }
-            if (lineBuffer.length > 0) {
-                html += '<div style="margin-bottom:2px;">' + lineBuffer.join('&nbsp;&nbsp;') + '</div>';
-            }
-        }
-        
-        html += '</div>';
-        
-        // 营养成分表 - 小尺寸，固定在底部1/3
-        if (labelData.nutritionImage) {
-            html += `<div style="position:relative;margin-top:5px;height:33%;max-height:120px;overflow:hidden;display:flex;align-items:center;justify-content:center;">
-                       <img src="${labelData.nutritionImage}" style="width:100%;height:auto;max-height:100%;object-fit:contain;">
-                     </div>`;
-        }
-        
+    }
+    
+    // 输出所有文本作为一个连续的段落
+    html += fullText;
+    html += '</div>'; 
+    
+    // 营养成分表 - 小尺寸，严格限制在底部1/3
+if (labelData.nutritionImage) {
+    html += `<div style="margin-top:8px;height:33%;max-height:33%;overflow:hidden;display:flex;align-items:center;justify-content:center;">
+               <img src="${labelData.nutritionImage}" style="width:100%;height:100%;object-fit:contain;">
+             </div>`;
+}
+    
     } else {
         // 大纸张：传统布局
         for (const field of fields) {

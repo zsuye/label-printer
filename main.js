@@ -154,7 +154,7 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
   // 根据纸张大小动态调整字体大小
   let baseFontSize;
   if (isSmallPaper) {
-    baseFontSize = Math.min(8, contentWidth / 30);
+    baseFontSize = 8;
   } else {
     baseFontSize = Math.min(12, contentWidth / 20);
   }
@@ -194,16 +194,15 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
   
   // 根据纸张大小选择布局方式
   if (isSmallPaper) {
-    // 小纸张：紧凑布局，多个字段放在同一行
-    let lineBuffer = [];
-    let lineWidth = 0;
-    const separator = '  '; // 两个空格分隔
-    const separatorWidth = doc.widthOfString(separator);
+    // 小纸张：完全不分行，连续文本流布局
+    let fullText = '';
+    const separator = '； '; // 两个空格分隔
     
     // 预留营养成分表空间（下1/3）
     const nutritionHeight = labelData.nutritionImage ? contentHeight * 0.33 : 0;
     const textAreaHeight = contentHeight - nutritionHeight;
     
+    // 构建完整的文本内容
     for (const field of fields) {
       if (labelData[field.key]) {
         // 跳过已经在顶部显示的品名
@@ -211,94 +210,55 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
           continue;
         }
         
-        const text = `${field.label}：${labelData[field.key]}`;
-        const textWidth = doc.widthOfString(text);
-        
-        // 判断是否需要换行
-        if (lineWidth + textWidth + (lineBuffer.length > 0 ? separatorWidth : 0) > contentWidth || 
-            // 某些字段强制独占一行
-            ['ingredients', 'address', 'usage', 'tips', 'allergen'].includes(field.key)) {
-          
-          // 输出当前行
-          if (lineBuffer.length > 0) {
-            if (currentY < margin + textAreaHeight - baseFontSize) {
-              doc.font('Chinese').text(lineBuffer.join(separator), margin, currentY, {
-                width: contentWidth,
-                align: 'left'
-              });
-              currentY += baseFontSize * 1.3;
-            }
-            lineBuffer = [];
-            lineWidth = 0;
-          }
-          
-          // 长文本字段独占行
-          if (['ingredients', 'address', 'usage', 'tips', 'allergen'].includes(field.key)) {
-            if (currentY < margin + textAreaHeight - baseFontSize) {
-              const lines = doc.heightOfString(text, { width: contentWidth });
-              doc.font('Chinese').text(text, margin, currentY, {
-                width: contentWidth,
-                align: 'left'
-              });
-              currentY += lines + 2;
-            }
-          } else {
-            lineBuffer.push(text);
-            lineWidth = textWidth;
-          }
-        } else {
-          // 添加到当前行
-          lineBuffer.push(text);
-          lineWidth += textWidth + (lineBuffer.length > 1 ? separatorWidth : 0);
+        if (fullText) {
+          fullText += separator;
         }
+        fullText += `${field.label}：${labelData[field.key]}`;
       }
     }
     
-    // 输出最后一行
-    if (lineBuffer.length > 0 && currentY < margin + textAreaHeight - baseFontSize) {
-      doc.font('Chinese').text(lineBuffer.join(separator), margin, currentY, {
-        width: contentWidth,
-        align: 'left'
-      });
-      currentY += baseFontSize * 1.3;
-    }
-    
-    // 额外字段也采用紧凑布局
+    // 添加额外字段
     if (labelData.extraFields && labelData.extraFields.length > 0) {
-      lineBuffer = [];
-      lineWidth = 0;
-      
       for (const field of labelData.extraFields) {
         if (field.label && field.value) {
-          const text = `${field.label}：${field.value}`;
-          const textWidth = doc.widthOfString(text);
-          
-          if (lineWidth + textWidth + (lineBuffer.length > 0 ? separatorWidth : 0) > contentWidth) {
-            if (lineBuffer.length > 0 && currentY < margin + textAreaHeight - baseFontSize) {
-              doc.font('Chinese').text(lineBuffer.join(separator), margin, currentY, {
-                width: contentWidth,
-                align: 'left'
-              });
-              currentY += baseFontSize * 1.3;
-              lineBuffer = [];
-              lineWidth = 0;
-            }
+          if (fullText) {
+            fullText += separator;
           }
-          
-          lineBuffer.push(text);
-          lineWidth += textWidth + (lineBuffer.length > 1 ? separatorWidth : 0);
+          fullText += `${field.label}：${field.value}`;
         }
-      }
-      
-      if (lineBuffer.length > 0 && currentY < margin + textAreaHeight - baseFontSize) {
-        doc.font('Chinese').text(lineBuffer.join(separator), margin, currentY, {
-          width: contentWidth,
-          align: 'left'
-        });
-        currentY += baseFontSize * 1.3;
       }
     }
     
+    // 输出所有文本，让PDFKit自动处理换行
+    if (fullText) {
+      // 计算实际可用高度
+      const maxTextHeight = textAreaHeight - 5; // 留5点边距
+      
+      // 设置文本选项
+      const textOptions = {
+        width: contentWidth,
+        align: 'left',
+        lineBreak: true,
+        wordSpacing: 0,
+        characterSpacing: 0,
+        lineGap: -1, // 减小行间距，使文本更紧凑
+        paragraphGap: 0
+      };
+      
+      // 检查文本高度是否超出
+      const textHeight = doc.heightOfString(fullText, textOptions);
+      
+      if (textHeight > maxTextHeight) {
+        // 如果文本太长，稍微缩小字体
+        doc.fontSize(baseFontSize * 0.9);
+      }
+      
+      // 输出文本
+      doc.font('Chinese').text(fullText, margin, currentY, textOptions);
+      
+      // 更新Y坐标到文本结束位置
+      currentY = margin + Math.min(textHeight, maxTextHeight);
+    }
   } else {
     // 大纸张：传统的一行一个字段布局
     for (const field of fields) {
@@ -351,9 +311,10 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
       let imageY, imageHeight;
       
       if (isSmallPaper) {
-        // 小纸张：使用动态计算的营养成分表空间
-        imageY = currentY + 3; // 文字内容结束后留3点间隔
-        imageHeight = height - margin - imageY; // 使用剩余的所有空间
+          // 小纸张：固定使用底部1/3空间
+        const totalUsableHeight = height - (margin * 2);
+        imageHeight = totalUsableHeight * 0.4;  // 严格限制为1/3高度
+        imageY = height - margin - imageHeight;  // 从底部算起
         
         // 确保至少有最小显示空间
         if (imageHeight > 15) {
