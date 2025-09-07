@@ -93,6 +93,8 @@ function setupEventListeners() {
     
     // 新增标签
     document.getElementById('addLabelBtn').addEventListener('click', createNewLabel);
+    // 复制标签按钮
+document.getElementById('copyLabelBtn').addEventListener('click', copyCurrentLabel);
     
     // 导入导出
     document.getElementById('importBtn').addEventListener('click', importLabels);
@@ -420,6 +422,49 @@ function createNewLabel() {
 
 
 
+// 复制当前标签
+function copyCurrentLabel() {
+    if (!currentLabel) {
+        showSuccessMessage('请先选择一个标签');
+        return;
+    }
+    
+    // 创建新标签，复制所有属性
+    const newLabel = {
+        ...currentLabel, // 复制所有属性
+        id: Date.now().toString(), // 新的唯一ID
+        labelName: `${currentLabel.labelName || currentLabel.productName} - 副本`, // 添加副本标识
+        createdAt: new Date().toISOString()
+    };
+    
+    // 如果有营养成分表图片，也复制
+    if (currentLabel.nutritionImage) {
+        newLabel.nutritionImage = currentLabel.nutritionImage;
+    }
+    
+    // 如果有额外字段，深拷贝
+    if (currentLabel.extraFields) {
+        newLabel.extraFields = JSON.parse(JSON.stringify(currentLabel.extraFields));
+    }
+    
+    // 添加到标签列表
+    labels.push(newLabel);
+    saveLabelsToStorage();
+    renderLabelList();
+    
+    // 选中新标签
+    selectLabel(newLabel);
+    
+    // 显示成功提示
+    showSuccessMessage('标签复制成功！请修改标签名称');
+    
+    // 自动聚焦到标签名称输入框，方便用户修改
+    setTimeout(() => {
+        document.getElementById('labelName').focus();
+        document.getElementById('labelName').select();
+    }, 100);
+}
+
 // 生成保质期文本 - 符合GB7718-2025标准
 function generateShelfLifeText(label) {
     const type = label.shelfLifeType;
@@ -458,13 +503,14 @@ function generateStorageCondition(label) {
     }
 }
 
-// 删除当前标签
+let deletedLabel = null; // 存储最近删除的标签
+
 async function deleteCurrentLabel() {
     if (!currentLabel) return;
     
-    if (!window.confirm(`确定要删除标签"${currentLabel.labelName || currentLabel.productName}"吗？`)) {
-        return;
-    }
+    // 保存被删除的标签
+    deletedLabel = { ...currentLabel };
+    const labelName = currentLabel.labelName || currentLabel.productName;
     
     labels = labels.filter(l => l.id !== currentLabel.id);
     saveLabelsToStorage();
@@ -474,6 +520,69 @@ async function deleteCurrentLabel() {
     document.getElementById('editorView').style.display = 'none';
     
     renderLabelList();
+    
+    // 显示可撤销的提示
+    showSuccessMessageWithUndo(`标签"${labelName}"已删除`, () => {
+        // 撤销删除
+        if (deletedLabel) {
+            labels.push(deletedLabel);
+            saveLabelsToStorage();
+            renderLabelList();
+            selectLabel(deletedLabel);
+            showSuccessMessage('已恢复删除的标签');
+            deletedLabel = null;
+        }
+    });
+}
+
+// 带撤销的提示消息
+function showSuccessMessageWithUndo(message, undoCallback) {
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #28a745;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 4px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    `;
+    
+    toast.innerHTML = `
+        <span>${message}</span>
+        <button style="
+            background: rgba(255,255,255,0.2);
+            border: 1px solid white;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+        ">撤销</button>
+    `;
+    
+    const undoBtn = toast.querySelector('button');
+    undoBtn.onclick = () => {
+        undoCallback();
+        document.body.removeChild(toast);
+    };
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        if (document.body.contains(toast)) {
+            toast.style.animation = 'slideOut 0.3s ease';
+            setTimeout(() => {
+                if (document.body.contains(toast)) {
+                    document.body.removeChild(toast);
+                }
+            }, 300);
+        }
+    }, 5000);
 }
 
 // 保存标签到存储
