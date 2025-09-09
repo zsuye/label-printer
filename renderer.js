@@ -698,20 +698,24 @@ function formatDate(date) {
 function generatePreviewHTML(labelData, settings) {
     let html = '';
     
-    // 判断是否为小尺寸纸张
-    const isSmallPaper = settings.paperSize === '70x70mm' || 
-                         (settings.paperSize === 'custom' && 
-                          parseFloat(settings.customWidth) < 75 && 
-                          parseFloat(settings.customHeight) < 75);
+    // 判断纸张类型
+    const isSmallPaper = settings.paperSize === '70x70mm';
+    const isMediumPaper = settings.paperSize === '70x100mm';
+    const isCustomSmall = settings.paperSize === 'custom' && 
+                         parseFloat(settings.customWidth) < 75 && 
+                         parseFloat(settings.customHeight) < 75;
     
     // 设置容器样式
-    if (isSmallPaper) {
+    if (isSmallPaper || isCustomSmall) {
         html = '<div style="font-size:10px;line-height:1.3;">';
+    } else if (isMediumPaper) {
+        html = '<div style="font-size:10px;line-height:1.5;">'; // 70x100mm使用10px字体
     } else {
         html = '<div style="font-size:12px;line-height:1.6;">';
     }
 
-     if (labelData.cornerTag) {
+    // 角标
+    if (labelData.cornerTag) {
         const tagFontSize = '8px';
         html += `
             <div style="
@@ -733,7 +737,7 @@ function generatePreviewHTML(labelData, settings) {
     
     // 如果品名要独立显示在顶部
     if (settings.showProductNameOnTop && labelData.productName) {
-        const titleSize = isSmallPaper ? '13px' : '16px';
+        const titleSize = isSmallPaper || isMediumPaper ? '11px' : '16px';
         html += `<div style="text-align:center;font-size:${titleSize};font-weight:bold;margin-bottom:8px;">${labelData.productName}</div>`;
     }
     
@@ -758,47 +762,44 @@ function generatePreviewHTML(labelData, settings) {
         { key: 'tips', label: '温馨提示' }
     ];
     
-    if (isSmallPaper) {
-          // 小纸张：完全不分行的连续文本流布局
-    html += '<div style="word-wrap:break-word;word-break:break-word;">';
-    
-    let fullText = '';
-    const separator = '&nbsp;&nbsp;'; // 两个不换行空格分隔
-    
-    for (const field of fields) {
-        if (labelData[field.key]) {
-          if (fullText) {
-                fullText += separator;
-            }
-            fullText += `<strong>${field.label}：</strong>${labelData[field.key]}`;
-        }
-    }
-    
-    // 额外字段也加入连续文本流
-    if (labelData.extraFields && labelData.extraFields.length > 0) {
-        for (const field of labelData.extraFields) {
-            if (field.label && field.value) {
+    if (isSmallPaper || isCustomSmall) {
+        // 小纸张：连续文本流布局
+        html += '<div style="word-wrap:break-word;word-break:break-word;">';
+        
+        let fullText = '';
+        const separator = '&nbsp;&nbsp;';
+        
+        for (const field of fields) {
+            if (labelData[field.key]) {
                 if (fullText) {
                     fullText += separator;
                 }
-                fullText += `<strong>${field.label}：</strong>${field.value}`;
+                fullText += `<strong>${field.label}：</strong>${labelData[field.key]}`;
             }
         }
-    }
-    
-    // 输出所有文本作为一个连续的段落
-    html += fullText;
-    html += '</div>'; 
+        
+        if (labelData.extraFields && labelData.extraFields.length > 0) {
+            for (const field of labelData.extraFields) {
+                if (field.label && field.value) {
+                    if (fullText) {
+                        fullText += separator;
+                    }
+                    fullText += `<strong>${field.label}：</strong>${field.value}`;
+                }
+            }
+        }
+        
+        html += fullText;
+        html += '</div>'; 
 
-    // 营养成分表 - 小尺寸，严格限制在底部1/3
-if (labelData.nutritionImage) {
-    html += `<div style="margin-top:8px;height:33%;max-height:33%;overflow:hidden;display:flex;align-items:center;justify-content:center;">
-               <img src="${labelData.nutritionImage}" style="width:100%;height:100%;object-fit:contain;">
-             </div>`;
-}
-    
+        // 营养成分表 - 小尺寸
+        if (labelData.nutritionImage) {
+            html += `<div style="margin-top:8px;height:33%;max-height:33%;overflow:hidden;display:flex;align-items:center;justify-content:center;">
+                       <img src="${labelData.nutritionImage}" style="width:100%;height:100%;object-fit:contain;">
+                     </div>`;
+        }
     } else {
-        // 大纸张：传统布局
+        // 中等和大纸张：传统布局（一行一个字段）
         for (const field of fields) {
             if (labelData[field.key]) {
                 html += `<div><strong>${field.label}：</strong>${labelData[field.key]}</div>`;
@@ -814,11 +815,19 @@ if (labelData.nutritionImage) {
             });
         }
         
-        // 营养成分表 - 正常尺寸
+        // 营养成分表
         if (labelData.nutritionImage) {
-            html += `<div style="margin-top:10px;">
-                       <img src="${labelData.nutritionImage}" style="max-width:100%;">
-                     </div>`;
+            if (isMediumPaper) {
+                // 70x100mm：压缩到1/4
+                html += `<div style="margin-top:8px;height:25%;max-height:25%;overflow:hidden;">
+                           <img src="${labelData.nutritionImage}" style="width:100%;height:100%;object-fit:contain;">
+                         </div>`;
+            } else {
+                // 大纸张：正常尺寸
+                html += `<div style="margin-top:10px;">
+                           <img src="${labelData.nutritionImage}" style="max-width:100%;">
+                         </div>`;
+            }
         }
     }
     
@@ -826,22 +835,29 @@ if (labelData.nutritionImage) {
     return html;
 }
 
-// 同时更新预览区域的样式以适应不同纸张
+// 更新预览区域的样式以适应不同纸张
 function updatePreviewAreaStyle(settings) {
     const previewContent = document.getElementById('previewContent');
     
-    // 判断是否为小尺寸纸张
-    const isSmallPaper = settings.paperSize === '70x70mm' || 
-                         (settings.paperSize === 'custom' && 
-                          parseFloat(settings.customWidth) < 75 && 
-                          parseFloat(settings.customHeight) < 75);
+    // 判断纸张类型
+    const isSmallPaper = settings.paperSize === '70x70mm';
+    const isMediumPaper = settings.paperSize === '70x100mm';
+    const isCustomSmall = settings.paperSize === 'custom' && 
+                         parseFloat(settings.customWidth) < 75 && 
+                         parseFloat(settings.customHeight) < 75;
     
-    if (isSmallPaper) {
+    if (isSmallPaper || isCustomSmall) {
         // 小纸张预览样式
         previewContent.style.minHeight = '300px';
         previewContent.style.maxHeight = '400px';
         previewContent.style.padding = '10px';
         previewContent.className = 'preview-content preview-content-small';
+    } else if (isMediumPaper) {
+        // 70x100mm预览样式
+        previewContent.style.minHeight = '350px';
+        previewContent.style.maxHeight = '500px';
+        previewContent.style.padding = '12px';
+        previewContent.className = 'preview-content preview-content-medium';
     } else {
         // 正常纸张预览样式
         previewContent.style.minHeight = '400px';

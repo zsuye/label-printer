@@ -109,17 +109,21 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
   } else if (settings.paperSize === '70x70mm') {
     width = mmToPoints(70);
     height = mmToPoints(70);
+  } else if (settings.paperSize === '70x100mm') {
+    width = mmToPoints(70);
+    height = mmToPoints(100);
   } else {
     // 默认 76x130mm
     width = mmToPoints(76);
     height = mmToPoints(130);
   }
   
-  // 判断是否为小尺寸纸张 
-  const isSmallPaper = width < mmToPoints(75) && height < mmToPoints(75);
+  // 判断纸张类型
+  const isSmallPaper = settings.paperSize === '70x70mm';
+  const isMediumPaper = settings.paperSize === '70x100mm';
   
   // 根据纸张大小调整边距
-  const margin = isSmallPaper ? mmToPoints(3) : mmToPoints(5);
+  const margin = isSmallPaper||isMediumPaper ? mmToPoints(3) : mmToPoints(5);
   
   const doc = new PDFDocument({
     size: [width, height],
@@ -155,6 +159,8 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
   let baseFontSize;
   if (isSmallPaper) {
     baseFontSize = 8;
+  } else if (isMediumPaper) {
+    baseFontSize = 8; // 70x100mm使用8号字体
   } else {
     baseFontSize = Math.min(12, contentWidth / 20);
   }
@@ -192,27 +198,22 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
   
   doc.fontSize(baseFontSize);
 
+  // 角标处理
   if (labelData.cornerTag) {
     const tagText = labelData.cornerTag;
     const tagFontSize = 8;
     const tagPadding = 2;
     
-    // 设置字体
     doc.font('Chinese').fontSize(tagFontSize);
     
-    // 计算文字宽度
     const tagWidth = Math.min(doc.widthOfString(tagText) + (tagPadding * 2), mmToPoints(15));
     const tagHeight = tagFontSize + (tagPadding * 2);
     
-    // 右上角位置
     const tagX = width - margin - tagWidth - mmToPoints(2);
     const tagY = margin;
     
-    // 绘制边框
-    doc.rect(tagX, tagY, tagWidth, tagHeight)
-      .stroke();
+    doc.rect(tagX, tagY, tagWidth, tagHeight).stroke();
     
-    // 绘制文字（支持自动换行）
     doc.text(tagText, tagX + tagPadding, tagY + tagPadding, {
       width: tagWidth - (tagPadding * 2),
       height: tagHeight - (tagPadding * 2),
@@ -220,21 +221,18 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
       lineBreak: true
     });
     
-    // 恢复字体大小
     doc.fontSize(baseFontSize);
   }
   
-  // 根据纸张大小选择布局方式
+  // 根据纸张类型选择布局方式
   if (isSmallPaper) {
     // 小纸张：完全不分行，连续文本流布局
     let fullText = '';
-    const separator = '； '; // 两个空格分隔
+    const separator = ' | ';
     
-    // 预留营养成分表空间（下1/3）
     const nutritionHeight = labelData.nutritionImage ? contentHeight * 0.33 : 0;
     const textAreaHeight = contentHeight - nutritionHeight;
     
-    // 构建完整的文本内容
     for (const field of fields) {
       if (labelData[field.key]) {
         if (fullText) {
@@ -244,7 +242,6 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
       }
     }
     
-    // 添加额外字段
     if (labelData.extraFields && labelData.extraFields.length > 0) {
       for (const field of labelData.extraFields) {
         if (field.label && field.value) {
@@ -256,44 +253,35 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
       }
     }
     
-    // 输出所有文本，让PDFKit自动处理换行
     if (fullText) {
-      // 计算实际可用高度
-      const maxTextHeight = textAreaHeight - 5; // 留5点边距
+      const maxTextHeight = textAreaHeight - 5;
       
-      // 设置文本选项
       const textOptions = {
         width: contentWidth,
         align: 'left',
         lineBreak: true,
         wordSpacing: 0,
         characterSpacing: 0,
-        lineGap: -1, // 减小行间距，使文本更紧凑
+        lineGap: -1,
         paragraphGap: 0
       };
       
-      // 检查文本高度是否超出
       const textHeight = doc.heightOfString(fullText, textOptions);
       
       if (textHeight > maxTextHeight) {
-        // 如果文本太长，稍微缩小字体
         doc.fontSize(baseFontSize * 0.9);
       }
       
-      // 输出文本
       doc.font('Chinese').text(fullText, margin, currentY, textOptions);
-      
-      // 更新Y坐标到文本结束位置
       currentY = margin + Math.min(textHeight, maxTextHeight);
     }
   } else {
-    // 大纸张：传统的一行一个字段布局
+    // 中等纸张（70x100mm）和大纸张：传统的一行一个字段布局
     for (const field of fields) {
       if (labelData[field.key]) {
         const text = `${field.label}：${labelData[field.key]}`;
         const lines = doc.heightOfString(text, { width: contentWidth });
         
-        // 检查是否超出页面
         if (currentY + lines > height - margin) {
           break;
         }
@@ -327,28 +315,35 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
     }
   }
   
-  // 如果有营养成分表图片
+  // 营养成分表图片处理
   if (labelData.nutritionImage) {
     try {
       let imageY, imageHeight;
       
       if (isSmallPaper) {
-          // 小纸张：固定使用底部1/3空间
+        // 小纸张：固定使用底部1/3空间
         const totalUsableHeight = height - (margin * 2);
-        imageHeight = totalUsableHeight * 0.4;  // 严格限制为1/3高度
-        imageY = height - margin - imageHeight;  // 从底部算起
+        imageHeight = totalUsableHeight * 0.4;
+        imageY = height - margin - imageHeight;
         
-        // 确保至少有最小显示空间
         if (imageHeight > 15) {
-          // 将base64转换为buffer
           const imageBuffer = Buffer.from(labelData.nutritionImage.split(',')[1], 'base64');
-          
-          // 对于小纸张，使用精确尺寸而不是保持宽高比，允许图片被压扁
-          // 这样可以确保营养成分表完全显示，即使会被压扁
           doc.image(imageBuffer, margin, imageY, {
             width: contentWidth,
             height: imageHeight
-            // 不使用fit选项，图片会被拉伸适应尺寸
+          });
+        }
+      } else if (isMediumPaper) {
+        // 70x100mm：营养成分表压缩到1/4
+        const totalUsableHeight = height - (margin * 2);
+        imageHeight = totalUsableHeight * 0.2; // 1/5高度
+        imageY = height - margin - imageHeight;
+        
+        if (imageHeight > 10) {
+          const imageBuffer = Buffer.from(labelData.nutritionImage.split(',')[1], 'base64');
+          doc.image(imageBuffer, margin, imageY, {
+            width: contentWidth,
+            height: imageHeight
           });
         }
       } else {
@@ -358,12 +353,11 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
         imageHeight = Math.min(remainingHeight - 5, contentWidth * 0.8);
         
         if (imageHeight > 10) {
-          // 将base64转换为buffer
           const imageBuffer = Buffer.from(labelData.nutritionImage.split(',')[1], 'base64');
           doc.image(imageBuffer, margin, imageY, {
             width: contentWidth,
             height: imageHeight,
-            fit: [contentWidth, imageHeight], // 大纸张保持宽高比
+            fit: [contentWidth, imageHeight],
             align: 'center',
             valign: 'center'
           });
