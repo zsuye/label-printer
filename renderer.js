@@ -197,6 +197,16 @@ function setupEventListeners() {
             hideSuggestions();
         }
     });
+    // 监听经营者字段变化
+    document.getElementById('operator').addEventListener('input', (e) => {
+        const isBulkFood = document.getElementById('isBulkFood').checked;
+        if (isBulkFood) {
+            updateProductionDateLabel(true);
+            // 清空PDF缓存，需要重新预览
+            currentPdfPath = null;
+            document.getElementById('previewContent').innerHTML = '<p>经营者信息已变更，点击预览按钮查看效果</p>';
+        }
+    });
 }
 
 // 确保DOM加载完成后初始化 - 重要！
@@ -730,7 +740,14 @@ async function saveLabelSettings() {
 function updateProductionDateLabel(isBulkFood) {
     const dateField = document.getElementById('productionDate').parentElement.querySelector('label');
     if (dateField) {
-        dateField.textContent = isBulkFood ? '分装日期 *' : '生产日期 *';
+        if (isBulkFood) {
+            // 检查是否有经营者信息
+            const hasOperator = document.getElementById('operator').value && 
+                               document.getElementById('operator').value.trim() !== '';
+            dateField.textContent = hasOperator ? '分装日期 *' : '生产日期 *';
+        } else {
+            dateField.textContent = '生产日期 *';
+        }
     }
 }
 
@@ -780,20 +797,14 @@ function formatDate(date) {
 // 生成预览HTML - 改进版，支持自适应布局
 function generatePreviewHTML(labelData, settings) {
     let html = '';
-    
     const isSmallPaper = settings.paperSize === '70x70mm';
     const isMediumPaper = settings.paperSize === '70x100mm';
-    const isCustomSmall = settings.paperSize === 'custom' && 
-                         parseFloat(settings.customWidth) < 75 && 
+    const isCustomSmall = settings.paperSize === 'custom' &&
+                         parseFloat(settings.customWidth) < 75 &&
                          parseFloat(settings.customHeight) < 75;
-    
-    // 【新增】检查是否为散装食品模式
     const isBulkFood = settings.isBulkFood;
-    
-    // 散装食品使用更大的字体
     let fontSize;
     if (isBulkFood) {
-        // 散装食品属性少，可以用更大字体
         if (isSmallPaper || isCustomSmall) {
             fontSize = '11px';
         } else if (isMediumPaper) {
@@ -802,7 +813,6 @@ function generatePreviewHTML(labelData, settings) {
             fontSize = '14px';
         }
     } else {
-        // 预包装食品原有字体大小
         if (isSmallPaper || isCustomSmall) {
             fontSize = '10px';
         } else if (isMediumPaper) {
@@ -811,11 +821,7 @@ function generatePreviewHTML(labelData, settings) {
             fontSize = '12px';
         }
     }
-    
-    // 设置容器样式
     html = `<div style="font-size:${fontSize};line-height:${isBulkFood ? '1.6' : '1.5'};">`;
-
-    // 角标
     if (labelData.cornerTag) {
         const tagFontSize = '8px';
         html += `
@@ -835,29 +841,32 @@ function generatePreviewHTML(labelData, settings) {
             ">${labelData.cornerTag}</div>
         `;
     }
-    
-    // 【散装食品】固定在顶部显示"散装食品标签"
     if (isBulkFood) {
         const titleSize = isSmallPaper ? '12px' : isMediumPaper ? '14px' : '16px';
         html += `<div style="text-align:center;font-size:${titleSize};font-weight:bold;margin-bottom:10px;border-bottom:1px solid #333;padding-bottom:5px;">散装食品标签</div>`;
     } else if (settings.showProductNameOnTop && labelData.productName) {
-        // 预包装食品的品名独立显示
         const titleSize = isSmallPaper || isMediumPaper ? '11px' : '16px';
         html += `<div style="text-align:center;font-size:${titleSize};font-weight:bold;margin-bottom:8px;">${labelData.productName}</div>`;
     }
-    
-    // 定义字段
     let fields;
     if (isBulkFood) {
-        // 散装食品专用字段列表和顺序
+        // 动态构建字段列表，根据是否有分装日期决定
         fields = [
             { key: 'productName', label: '产品名称' },
             { key: 'origin', label: '产地' },
             { key: 'ingredients', label: '配料' },
             { key: 'licenseNo', label: '生产许可证号' },
-            { key: 'productionDateBulk', label: '生产日期' }, // 散装食品的生产日期
-            { key: 'shelfLife', label: '保质期' },
-            { key: 'packingDate', label: '分装日期' }, // 分装日期
+            { key: 'productionDateBulk', label: '生产日期' },
+            { key: 'shelfLife', label: '保质期' }
+        ];
+        
+        // 如果有分装日期，才添加这个字段
+        if (labelData.packingDate) {
+            fields.push({ key: 'packingDate', label: '分装日期' });
+        }
+        
+        // 添加其余字段
+        fields.push(
             { key: 'storageCondition', label: '贮存条件' },
             { key: 'usage', label: '食用方法' },
             { key: 'manufacturer', label: '生产商' },
@@ -866,9 +875,8 @@ function generatePreviewHTML(labelData, settings) {
             { key: 'operator', label: '经营者' },
             { key: 'operatorPhone', label: '经营者电话' },
             { key: 'tips', label: '温馨提示' }
-        ];
+        );
     } else {
-        // 预包装食品原有字段
         fields = [
             { key: 'productName', label: '品名' },
             { key: 'ingredients', label: '配料' },
@@ -889,15 +897,10 @@ function generatePreviewHTML(labelData, settings) {
             { key: 'tips', label: '温馨提示' }
         ];
     }
-    
-    // 渲染字段
     if (isSmallPaper || isCustomSmall) {
-        // 小纸张：连续文本流布局
         html += '<div style="word-wrap:break-word;word-break:break-word;">';
-        
         let fullText = '';
         const separator = '&nbsp;&nbsp;';
-        
         for (const field of fields) {
             if (labelData[field.key]) {
                 if (fullText) {
@@ -906,7 +909,6 @@ function generatePreviewHTML(labelData, settings) {
                 fullText += `<strong>${field.label}：</strong>${labelData[field.key]}`;
             }
         }
-        
         // 预包装食品显示额外字段
         if (!isBulkFood && labelData.extraFields && labelData.extraFields.length > 0) {
             for (const field of labelData.extraFields) {
@@ -918,10 +920,8 @@ function generatePreviewHTML(labelData, settings) {
                 }
             }
         }
-        
         html += fullText;
-        html += '</div>'; 
-
+        html += '</div>';
         // 营养成分表（仅预包装食品）
         if (!isBulkFood && labelData.nutritionImage) {
             html += `<div style="margin-top:8px;height:33%;max-height:33%;overflow:hidden;display:flex;align-items:center;justify-content:center;">
@@ -935,7 +935,6 @@ function generatePreviewHTML(labelData, settings) {
                 html += `<div style="margin-bottom:${isBulkFood ? '4px' : '2px'};"><strong>${field.label}：</strong>${labelData[field.key]}</div>`;
             }
         }
-        
         // 预包装食品显示额外字段
         if (!isBulkFood && labelData.extraFields && labelData.extraFields.length > 0) {
             labelData.extraFields.forEach(field => {
@@ -944,7 +943,6 @@ function generatePreviewHTML(labelData, settings) {
                 }
             });
         }
-        
         // 营养成分表（仅预包装食品）
         if (!isBulkFood && labelData.nutritionImage) {
             if (isMediumPaper) {
@@ -958,7 +956,6 @@ function generatePreviewHTML(labelData, settings) {
             }
         }
     }
-    
     html += '</div>';
     return html;
 }
@@ -1001,37 +998,43 @@ async function previewLabel() {
         showSuccessMessage('请先选择一个标签');
         return;
     }
-    
     const productionDate = document.getElementById('productionDate').value;
     if (!productionDate) {
         const isBulkFood = currentLabel.isBulkFood || false;
         showSuccessMessage(isBulkFood ? '请输入分装日期' : '请输入生产日期');
         return;
     }
-    
     // 保存设置
     await saveLabelSettings();
-    
     // 从标签数据读取是否为散装食品模式
     const isBulkFood = currentLabel.isBulkFood || false;
-    
     // 准备标签数据
     let labelData = {
         ...currentLabel
     };
-    
     if (isBulkFood) {
         // 散装食品模式
-        const packingDate = new Date(productionDate);
-        const productionDateBulk = new Date(packingDate);
-        productionDateBulk.setDate(productionDateBulk.getDate() - 2); // 生产日期为分装日期前两天
+        const hasOperator = currentLabel.operator && currentLabel.operator.trim() !== '';
         
-        labelData.packingDate = formatDate(packingDate);
-        labelData.productionDateBulk = formatDate(productionDateBulk);
+        if (hasOperator) {
+            // 有经营者信息：显示生产日期和分装日期
+            const packingDate = new Date(productionDate);
+            const productionDateBulk = new Date(packingDate);
+            productionDateBulk.setDate(productionDateBulk.getDate() - 2); // 生产日期为分装日期前两天
+            labelData.packingDate = formatDate(packingDate);
+            labelData.productionDateBulk = formatDate(productionDateBulk);
+        } else {
+            // 没有经营者信息：只显示生产日期（使用用户输入的日期）
+            labelData.productionDateBulk = formatDate(new Date(productionDate));
+            // 不设置 packingDate
+        }
         
         // 计算保质期至（基于生产日期）
         if (currentLabel.normalDays) {
-            const expiry = new Date(productionDateBulk);
+            const prodDate = labelData.productionDateBulk ? 
+                new Date(labelData.productionDateBulk.replace(/年/g, '-').replace(/月/g, '-').replace(/日/g, '')) : 
+                new Date(productionDate);
+            const expiry = new Date(prodDate);
             expiry.setDate(expiry.getDate() + parseInt(currentLabel.normalDays));
             labelData.expiryDate = formatDate(expiry);
         }
@@ -1040,7 +1043,6 @@ async function previewLabel() {
         labelData.productionDate = formatDate(new Date(productionDate));
         labelData.expiryDate = updateExpiryDate();
     }
-    
     // 获取打印设置
     const settings = {
         paperSize: document.getElementById('paperSize').value,
@@ -1049,13 +1051,10 @@ async function previewLabel() {
         showProductNameOnTop: document.getElementById('showProductNameOnTop').checked,
         isBulkFood: isBulkFood // 传递模式标识
     };
-    
     // 更新预览区域样式
     updatePreviewAreaStyle(settings);
-    
     // 生成PDF
     currentPdfPath = await window.electronAPI.generatePDF(labelData, settings);
-    
     // 显示预览内容
     const previewContent = document.getElementById('previewContent');
     previewContent.innerHTML = generatePreviewHTML(labelData, settings);

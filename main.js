@@ -210,15 +210,23 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
   // 定义字段顺序和显示
   let fields;
   if (isBulkFood) {
-    // 散装食品专用字段和顺序
+    // 动态构建字段列表
     fields = [
       { key: 'productName', label: '产品名称' },
       { key: 'origin', label: '产地' },
       { key: 'ingredients', label: '配料' },
       { key: 'licenseNo', label: '生产许可证号' },
       { key: 'productionDateBulk', label: '生产日期' },
-      { key: 'shelfLife', label: '保质期' },
-      { key: 'packingDate', label: '分装日期' },
+      { key: 'shelfLife', label: '保质期' }
+    ];
+    
+    // 如果有分装日期，才添加这个字段
+    if (labelData.packingDate) {
+      fields.push({ key: 'packingDate', label: '分装日期' });
+    }
+    
+    // 添加其余字段
+    fields.push(
       { key: 'storageCondition', label: '贮存条件' },
       { key: 'usage', label: '食用方法' },
       { key: 'manufacturer', label: '生产商' },
@@ -227,9 +235,8 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
       { key: 'operator', label: '经营者' },
       { key: 'operatorPhone', label: '经营者电话' },
       { key: 'tips', label: '温馨提示' }
-    ];
+    );
   } else {
-    // 预包装食品原有字段
     fields = [
       { key: 'productName', label: '品名' },
       { key: 'ingredients', label: '配料' },
