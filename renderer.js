@@ -7,8 +7,8 @@ let currentPdfPath = null;
 // 保存标签 - 修复版
 async function saveLabel(e) {
     if (e) {
-        e.preventDefault(); // 阻止表单默认提交
-        e.stopPropagation(); // 阻止事件冒泡
+        e.preventDefault();
+        e.stopPropagation();
     }
     
     if (!currentLabel) return;
@@ -35,6 +35,11 @@ async function saveLabel(e) {
         currentLabel.extraFields = getExtraFields();
         currentLabel.cornerTag = document.getElementById('cornerTag').value;
         
+        // 【新增】保存散装食品模式和专用字段
+        currentLabel.isBulkFood = document.getElementById('isBulkFood').checked;
+        currentLabel.operator = document.getElementById('operator').value;
+        currentLabel.operatorPhone = document.getElementById('operatorPhone').value;
+        
         // 更新保质期和贮存条件文本
         currentLabel.shelfLife = generateShelfLifeText(currentLabel);
         currentLabel.storageCondition = generateStorageCondition(currentLabel);
@@ -46,7 +51,7 @@ async function saveLabel(e) {
         // 保存输入历史
         await saveInputHistory();
         
-        // 显示成功提示（使用非阻塞方式）
+        // 显示成功提示
         showSuccessMessage('标签保存成功！');
         
     } catch (error) {
@@ -54,9 +59,9 @@ async function saveLabel(e) {
         showSuccessMessage('保存失败：' + error.message);
     }
     
-    // 返回false防止表单真的提交
     return false;
 }
+
 
 // 非阻塞的成功提示
 function showSuccessMessage(message) {
@@ -94,7 +99,7 @@ function setupEventListeners() {
     // 新增标签
     document.getElementById('addLabelBtn').addEventListener('click', createNewLabel);
     // 复制标签按钮
-document.getElementById('copyLabelBtn').addEventListener('click', copyCurrentLabel);
+    document.getElementById('copyLabelBtn').addEventListener('click', copyCurrentLabel);
     
     // 导入导出
     document.getElementById('importBtn').addEventListener('click', importLabels);
@@ -112,11 +117,22 @@ document.getElementById('copyLabelBtn').addEventListener('click', copyCurrentLab
     // 营养成分表上传
     document.getElementById('nutritionImage').addEventListener('change', handleImageUpload);
     
-    // 表单提交 - 修复这里！！！
+    // 【新增】散装食品模式切换 - 作为标签属性的一部分
+    document.getElementById('isBulkFood').addEventListener('change', (e) => {
+        const bulkFields = document.querySelectorAll('.bulk-food-field');
+        bulkFields.forEach(field => {
+            field.style.display = e.target.checked ? 'block' : 'none';
+        });
+        // 更新生产日期标签文字（仅在打印区域）
+        updateProductionDateLabel(e.target.checked);
+        // 清空预览，提示重新预览
+        currentPdfPath = null;
+        document.getElementById('previewContent').innerHTML = '<p>模式已切换，点击预览按钮查看效果</p>';
+    });
+    
+    // 表单提交
     const labelForm = document.getElementById('labelForm');
-    // 移除旧的监听器（如果有）
     labelForm.removeEventListener('submit', saveLabel);
-    // 添加新的监听器
     labelForm.addEventListener('submit', function(e) {
         e.preventDefault();
         e.stopPropagation();
@@ -136,6 +152,51 @@ document.getElementById('copyLabelBtn').addEventListener('click', copyCurrentLab
     
     // 生产日期变化时更新保质期至
     document.getElementById('productionDate').addEventListener('change', updateExpiryDate);
+
+      // 添加全局键盘快捷键监听
+    document.addEventListener('keydown', (e) => {
+        // Ctrl+S 或 Cmd+S (Mac)
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault(); // 阻止浏览器默认的保存行为
+            
+            // 只有在编辑视图显示时才保存
+            if (document.getElementById('editorView').style.display !== 'none' && currentLabel) {
+                saveLabel();
+            }
+        }
+        
+        // 可选：添加其他快捷键
+        // Ctrl+N 新建标签
+        if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+            e.preventDefault();
+            createNewLabel();
+        }
+        
+        // Ctrl+P 打印（仅在有当前标签时）
+        if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+            e.preventDefault();
+            if (currentLabel) {
+                printLabel();
+            }
+        }
+        
+        // Ctrl+E 导出
+        if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+            e.preventDefault();
+            exportLabels();
+        }
+        
+        // Ctrl+I 导入
+        if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
+            e.preventDefault();
+            importLabels();
+        }
+        
+        // ESC 键清除建议列表
+        if (e.key === 'Escape') {
+            hideSuggestions();
+        }
+    });
 }
 
 // 确保DOM加载完成后初始化 - 重要！
@@ -270,7 +331,7 @@ function selectLabel(label) {
 
 // 填充表单
 function fillForm(label) {
-  document.getElementById('labelName').value = label.labelName || '';
+    document.getElementById('labelName').value = label.labelName || '';
     document.getElementById('productName').value = label.productName || '';
     document.getElementById('ingredients').value = label.ingredients || '';
     document.getElementById('standardNo').value = label.standardNo || '';
@@ -285,6 +346,21 @@ function fillForm(label) {
     document.getElementById('allergen').value = label.allergen || '';
     document.getElementById('tips').value = label.tips || '';
     document.getElementById('cornerTag').value = label.cornerTag || '';
+    
+    // 【新增】填充散装食品模式和字段
+    const isBulkFood = label.isBulkFood || false;
+    document.getElementById('isBulkFood').checked = isBulkFood;
+    document.getElementById('operator').value = label.operator || '';
+    document.getElementById('operatorPhone').value = label.operatorPhone || '';
+    
+    // 显示/隐藏散装食品字段
+    const bulkFields = document.querySelectorAll('.bulk-food-field');
+    bulkFields.forEach(field => {
+        field.style.display = isBulkFood ? 'block' : 'none';
+    });
+    
+    // 更新生产日期标签文字
+    updateProductionDateLabel(isBulkFood);
     
     // 保质期类型
     document.getElementById('shelfLifeType').value = label.shelfLifeType || 'normal';
@@ -644,10 +720,17 @@ async function saveLabelSettings() {
     
     await window.electronAPI.saveData(`labelSettings_${currentLabel.id}`, settings);
     
-    // 保存生产日期
+    // 保存生产日期/分装日期
     const productionDate = document.getElementById('productionDate').value;
     if (productionDate) {
         await window.electronAPI.saveData('lastProductionDate', productionDate);
+    }
+}
+
+function updateProductionDateLabel(isBulkFood) {
+    const dateField = document.getElementById('productionDate').parentElement.querySelector('label');
+    if (dateField) {
+        dateField.textContent = isBulkFood ? '分装日期 *' : '生产日期 *';
     }
 }
 
@@ -698,24 +781,42 @@ function formatDate(date) {
 function generatePreviewHTML(labelData, settings) {
     let html = '';
     
-    // 判断纸张类型
     const isSmallPaper = settings.paperSize === '70x70mm';
     const isMediumPaper = settings.paperSize === '70x100mm';
     const isCustomSmall = settings.paperSize === 'custom' && 
                          parseFloat(settings.customWidth) < 75 && 
                          parseFloat(settings.customHeight) < 75;
     
-    // 设置容器样式
-    if (isSmallPaper || isCustomSmall) {
-        html = '<div style="font-size:10px;line-height:1.3;">';
-    } else if (isMediumPaper) {
-        html = '<div style="font-size:10px;line-height:1.5;">'; // 70x100mm使用10px字体
+    // 【新增】检查是否为散装食品模式
+    const isBulkFood = settings.isBulkFood;
+    
+    // 散装食品使用更大的字体
+    let fontSize;
+    if (isBulkFood) {
+        // 散装食品属性少，可以用更大字体
+        if (isSmallPaper || isCustomSmall) {
+            fontSize = '11px';
+        } else if (isMediumPaper) {
+            fontSize = '12px';
+        } else {
+            fontSize = '14px';
+        }
     } else {
-        html = '<div style="font-size:12px;line-height:1.6;">';
+        // 预包装食品原有字体大小
+        if (isSmallPaper || isCustomSmall) {
+            fontSize = '10px';
+        } else if (isMediumPaper) {
+            fontSize = '10px';
+        } else {
+            fontSize = '12px';
+        }
     }
+    
+    // 设置容器样式
+    html = `<div style="font-size:${fontSize};line-height:${isBulkFood ? '1.6' : '1.5'};">`;
 
     // 角标
-    if (labelData.cornerTag) {
+    if (!isBulkFood && labelData.cornerTag) {
         const tagFontSize = '8px';
         html += `
             <div style="
@@ -735,33 +836,61 @@ function generatePreviewHTML(labelData, settings) {
         `;
     }
     
-    // 如果品名要独立显示在顶部
-    if (settings.showProductNameOnTop && labelData.productName) {
+    // 【散装食品】固定在顶部显示"散装食品标签"
+    if (isBulkFood) {
+        const titleSize = isSmallPaper ? '12px' : isMediumPaper ? '14px' : '16px';
+        html += `<div style="text-align:center;font-size:${titleSize};font-weight:bold;margin-bottom:10px;border-bottom:1px solid #333;padding-bottom:5px;">散装食品标签</div>`;
+    } else if (settings.showProductNameOnTop && labelData.productName) {
+        // 预包装食品的品名独立显示
         const titleSize = isSmallPaper || isMediumPaper ? '11px' : '16px';
         html += `<div style="text-align:center;font-size:${titleSize};font-weight:bold;margin-bottom:8px;">${labelData.productName}</div>`;
     }
     
-    // 定义字段顺序
-    const fields = [
-        { key: 'productName', label: '品名' },
-        { key: 'ingredients', label: '配料' },
-        { key: 'standardNo', label: '产品标准号' },
-        { key: 'licenseNo', label: '生产许可证号' },
-        { key: 'shelfLife', label: '保质期' },
-        { key: 'productionDate', label: '生产日期' },
-        { key: 'expiryDate', label: '保质期至' },
-        { key: 'storageCondition', label: '贮存条件' },
-        { key: 'netContent', label: '净含量' },
-        { key: 'boxSpec', label: '箱规' },
-        { key: 'origin', label: '产地' },
-        { key: 'usage', label: '食用方法' },
-        { key: 'manufacturer', label: '生产商' },
-        { key: 'phone', label: '联系电话' },
-        { key: 'address', label: '地址' },
-        { key: 'allergen', label: '致敏物质提示' },
-        { key: 'tips', label: '温馨提示' }
-    ];
+    // 定义字段
+    let fields;
+    if (isBulkFood) {
+        // 散装食品专用字段列表和顺序
+        fields = [
+            { key: 'productName', label: '产品名称' },
+            { key: 'origin', label: '产地' },
+            { key: 'ingredients', label: '配料' },
+            { key: 'licenseNo', label: '生产许可证号' },
+            { key: 'productionDateBulk', label: '生产日期' }, // 散装食品的生产日期
+            { key: 'shelfLife', label: '保质期' },
+            { key: 'packingDate', label: '分装日期' }, // 分装日期
+            { key: 'storageCondition', label: '贮存条件' },
+            { key: 'usage', label: '食用方法' },
+            { key: 'manufacturer', label: '生产商' },
+            { key: 'address', label: '生产商地址' },
+            { key: 'phone', label: '生产商电话' },
+            { key: 'operator', label: '经营者' },
+            { key: 'operatorPhone', label: '经营者电话' },
+            { key: 'tips', label: '温馨提示' }
+        ];
+    } else {
+        // 预包装食品原有字段
+        fields = [
+            { key: 'productName', label: '品名' },
+            { key: 'ingredients', label: '配料' },
+            { key: 'standardNo', label: '产品标准号' },
+            { key: 'licenseNo', label: '生产许可证号' },
+            { key: 'shelfLife', label: '保质期' },
+            { key: 'productionDate', label: '生产日期' },
+            { key: 'expiryDate', label: '保质期至' },
+            { key: 'storageCondition', label: '贮存条件' },
+            { key: 'netContent', label: '净含量' },
+            { key: 'boxSpec', label: '箱规' },
+            { key: 'origin', label: '产地' },
+            { key: 'usage', label: '食用方法' },
+            { key: 'manufacturer', label: '生产商' },
+            { key: 'phone', label: '联系电话' },
+            { key: 'address', label: '地址' },
+            { key: 'allergen', label: '致敏物质提示' },
+            { key: 'tips', label: '温馨提示' }
+        ];
+    }
     
+    // 渲染字段
     if (isSmallPaper || isCustomSmall) {
         // 小纸张：连续文本流布局
         html += '<div style="word-wrap:break-word;word-break:break-word;">';
@@ -778,7 +907,8 @@ function generatePreviewHTML(labelData, settings) {
             }
         }
         
-        if (labelData.extraFields && labelData.extraFields.length > 0) {
+        // 预包装食品显示额外字段
+        if (!isBulkFood && labelData.extraFields && labelData.extraFields.length > 0) {
             for (const field of labelData.extraFields) {
                 if (field.label && field.value) {
                     if (fullText) {
@@ -792,22 +922,22 @@ function generatePreviewHTML(labelData, settings) {
         html += fullText;
         html += '</div>'; 
 
-        // 营养成分表 - 小尺寸
-        if (labelData.nutritionImage) {
+        // 营养成分表（仅预包装食品）
+        if (!isBulkFood && labelData.nutritionImage) {
             html += `<div style="margin-top:8px;height:33%;max-height:33%;overflow:hidden;display:flex;align-items:center;justify-content:center;">
                        <img src="${labelData.nutritionImage}" style="width:100%;height:100%;object-fit:contain;">
                      </div>`;
         }
     } else {
-        // 中等和大纸张：传统布局（一行一个字段）
+        // 中等和大纸张：传统布局
         for (const field of fields) {
             if (labelData[field.key]) {
-                html += `<div><strong>${field.label}：</strong>${labelData[field.key]}</div>`;
+                html += `<div style="margin-bottom:${isBulkFood ? '4px' : '2px'};"><strong>${field.label}：</strong>${labelData[field.key]}</div>`;
             }
         }
         
-        // 额外字段
-        if (labelData.extraFields && labelData.extraFields.length > 0) {
+        // 预包装食品显示额外字段
+        if (!isBulkFood && labelData.extraFields && labelData.extraFields.length > 0) {
             labelData.extraFields.forEach(field => {
                 if (field.label && field.value) {
                     html += `<div><strong>${field.label}：</strong>${field.value}</div>`;
@@ -815,15 +945,13 @@ function generatePreviewHTML(labelData, settings) {
             });
         }
         
-        // 营养成分表
-        if (labelData.nutritionImage) {
+        // 营养成分表（仅预包装食品）
+        if (!isBulkFood && labelData.nutritionImage) {
             if (isMediumPaper) {
-                // 70x100mm：压缩到1/4
                 html += `<div style="margin-top:8px;height:25%;max-height:25%;overflow:hidden;">
                            <img src="${labelData.nutritionImage}" style="width:100%;height:100%;object-fit:contain;">
                          </div>`;
             } else {
-                // 大纸张：正常尺寸
                 html += `<div style="margin-top:10px;">
                            <img src="${labelData.nutritionImage}" style="max-width:100%;">
                          </div>`;
@@ -876,26 +1004,50 @@ async function previewLabel() {
     
     const productionDate = document.getElementById('productionDate').value;
     if (!productionDate) {
-        showSuccessMessage('请输入生产日期');
+        const isBulkFood = currentLabel.isBulkFood || false;
+        showSuccessMessage(isBulkFood ? '请输入分装日期' : '请输入生产日期');
         return;
     }
     
     // 保存设置
     await saveLabelSettings();
     
+    // 从标签数据读取是否为散装食品模式
+    const isBulkFood = currentLabel.isBulkFood || false;
+    
     // 准备标签数据
-    const labelData = {
-        ...currentLabel,
-        productionDate: formatDate(new Date(productionDate)),
-        expiryDate: updateExpiryDate()
+    let labelData = {
+        ...currentLabel
     };
+    
+    if (isBulkFood) {
+        // 散装食品模式
+        const packingDate = new Date(productionDate);
+        const productionDateBulk = new Date(packingDate);
+        productionDateBulk.setDate(productionDateBulk.getDate() - 2); // 生产日期为分装日期前两天
+        
+        labelData.packingDate = formatDate(packingDate);
+        labelData.productionDateBulk = formatDate(productionDateBulk);
+        
+        // 计算保质期至（基于生产日期）
+        if (currentLabel.normalDays) {
+            const expiry = new Date(productionDateBulk);
+            expiry.setDate(expiry.getDate() + parseInt(currentLabel.normalDays));
+            labelData.expiryDate = formatDate(expiry);
+        }
+    } else {
+        // 预包装食品模式
+        labelData.productionDate = formatDate(new Date(productionDate));
+        labelData.expiryDate = updateExpiryDate();
+    }
     
     // 获取打印设置
     const settings = {
         paperSize: document.getElementById('paperSize').value,
         customWidth: document.getElementById('customWidth').value,
         customHeight: document.getElementById('customHeight').value,
-        showProductNameOnTop: document.getElementById('showProductNameOnTop').checked
+        showProductNameOnTop: document.getElementById('showProductNameOnTop').checked,
+        isBulkFood: isBulkFood // 传递模式标识
     };
     
     // 更新预览区域样式

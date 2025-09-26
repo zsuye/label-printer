@@ -95,7 +95,7 @@ ipcMain.handle('import-labels', async () => {
   return null;
 });
 
-// 生成PDF - 改进版，支持自适应布局
+// 生成PDF - 改进版，支持自适应布局和散装食品模式
 ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
   const tempPath = path.join(app.getPath('temp'), `label_${Date.now()}.pdf`);
   
@@ -121,6 +121,9 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
   // 判断纸张类型
   const isSmallPaper = settings.paperSize === '70x70mm';
   const isMediumPaper = settings.paperSize === '70x100mm';
+  
+  // 【新增】检查是否为散装食品模式
+  const isBulkFood = settings.isBulkFood;
   
   // 根据纸张大小调整边距
   const margin = isSmallPaper||isMediumPaper ? mmToPoints(3) : mmToPoints(5);
@@ -155,18 +158,47 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
   const contentHeight = height - (margin * 2);
   let currentY = margin;
   
-  // 根据纸张大小动态调整字体大小
+  // 根据纸张大小和模式动态调整字体大小
   let baseFontSize;
-  if (isSmallPaper) {
-    baseFontSize = 8;
-  } else if (isMediumPaper) {
-    baseFontSize = 8; // 70x100mm使用8号字体
+  if (isBulkFood) {
+    // 散装食品使用更大的字体
+    if (isSmallPaper) {
+      baseFontSize = 9;
+    } else if (isMediumPaper) {
+      baseFontSize = 10;
+    } else {
+      baseFontSize = Math.min(14, contentWidth / 18);
+    }
   } else {
-    baseFontSize = Math.min(12, contentWidth / 20);
+    // 预包装食品原有字体大小
+    if (isSmallPaper) {
+      baseFontSize = 8;
+    } else if (isMediumPaper) {
+      baseFontSize = 8;
+    } else {
+      baseFontSize = Math.min(12, contentWidth / 20);
+    }
   }
   
-  // 如果品名要独立显示在顶部
-  if (settings.showProductNameOnTop && labelData.productName) {
+  // 【散装食品】固定显示"散装食品标签"在顶部
+  if (isBulkFood) {
+    doc.font('Chinese').fontSize(baseFontSize * 1.4)
+       .text('散装食品标签', margin, currentY, {
+         width: contentWidth,
+         align: 'center'
+       });
+    
+    // 添加下划线
+    const textWidth = doc.widthOfString('散装食品标签');
+    const lineY = currentY + baseFontSize * 1.5;
+    const lineStartX = margin + (contentWidth - textWidth) / 2;
+    doc.moveTo(lineStartX, lineY)
+       .lineTo(lineStartX + textWidth, lineY)
+       .stroke();
+    
+    currentY += baseFontSize * 2.2;
+  } else if (settings.showProductNameOnTop && labelData.productName) {
+    // 预包装食品品名独立显示
     doc.font('Chinese').fontSize(baseFontSize * 1.3)
        .text(labelData.productName, margin, currentY, {
          width: contentWidth,
@@ -176,30 +208,53 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
   }
   
   // 定义字段顺序和显示
-  const fields = [
-    { key: 'productName', label: '品名' },
-    { key: 'ingredients', label: '配料' },
-    { key: 'standardNo', label: '产品标准号' },
-    { key: 'licenseNo', label: '生产许可证号' },
-    { key: 'shelfLife', label: '保质期' },
-    { key: 'productionDate', label: '生产日期' },
-    { key: 'expiryDate', label: '保质期至' },
-    { key: 'storageCondition', label: '贮存条件' },
-    { key: 'netContent', label: '净含量' },
-    { key: 'boxSpec', label: '箱规' },
-    { key: 'origin', label: '产地' },
-    { key: 'usage', label: '食用方法' },
-    { key: 'manufacturer', label: '生产商' },
-    { key: 'phone', label: '联系电话' },
-    { key: 'address', label: '地址' },
-    { key: 'allergen', label: '致敏物质提示' },
-    { key: 'tips', label: '温馨提示' }
-  ];
+  let fields;
+  if (isBulkFood) {
+    // 散装食品专用字段和顺序
+    fields = [
+      { key: 'productName', label: '产品名称' },
+      { key: 'origin', label: '产地' },
+      { key: 'ingredients', label: '配料' },
+      { key: 'licenseNo', label: '生产许可证号' },
+      { key: 'productionDateBulk', label: '生产日期' },
+      { key: 'shelfLife', label: '保质期' },
+      { key: 'packingDate', label: '分装日期' },
+      { key: 'storageCondition', label: '贮存条件' },
+      { key: 'usage', label: '食用方法' },
+      { key: 'manufacturer', label: '生产商' },
+      { key: 'address', label: '生产商地址' },
+      { key: 'phone', label: '生产商电话' },
+      { key: 'operator', label: '经营者' },
+      { key: 'operatorPhone', label: '经营者电话' },
+      { key: 'tips', label: '温馨提示' }
+    ];
+  } else {
+    // 预包装食品原有字段
+    fields = [
+      { key: 'productName', label: '品名' },
+      { key: 'ingredients', label: '配料' },
+      { key: 'standardNo', label: '产品标准号' },
+      { key: 'licenseNo', label: '生产许可证号' },
+      { key: 'shelfLife', label: '保质期' },
+      { key: 'productionDate', label: '生产日期' },
+      { key: 'expiryDate', label: '保质期至' },
+      { key: 'storageCondition', label: '贮存条件' },
+      { key: 'netContent', label: '净含量' },
+      { key: 'boxSpec', label: '箱规' },
+      { key: 'origin', label: '产地' },
+      { key: 'usage', label: '食用方法' },
+      { key: 'manufacturer', label: '生产商' },
+      { key: 'phone', label: '联系电话' },
+      { key: 'address', label: '地址' },
+      { key: 'allergen', label: '致敏物质提示' },
+      { key: 'tips', label: '温馨提示' }
+    ];
+  }
   
   doc.fontSize(baseFontSize);
 
-  // 角标处理
-  if (labelData.cornerTag) {
+  // 角标处理（仅预包装食品）
+  if (!isBulkFood && labelData.cornerTag) {
     const tagText = labelData.cornerTag;
     const tagFontSize = 8;
     const tagPadding = 2;
@@ -230,7 +285,7 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
     let fullText = '';
     const separator = ' | ';
     
-    const nutritionHeight = labelData.nutritionImage ? contentHeight * 0.33 : 0;
+    const nutritionHeight = (!isBulkFood && labelData.nutritionImage) ? contentHeight * 0.33 : 0;
     const textAreaHeight = contentHeight - nutritionHeight;
     
     for (const field of fields) {
@@ -242,7 +297,8 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
       }
     }
     
-    if (labelData.extraFields && labelData.extraFields.length > 0) {
+    // 预包装食品的额外字段
+    if (!isBulkFood && labelData.extraFields && labelData.extraFields.length > 0) {
       for (const field of labelData.extraFields) {
         if (field.label && field.value) {
           if (fullText) {
@@ -262,7 +318,7 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
         lineBreak: true,
         wordSpacing: 0,
         characterSpacing: 0,
-        lineGap: -1,
+        lineGap: isBulkFood ? 1 : -1, // 散装食品稍微增加行间距
         paragraphGap: 0
       };
       
@@ -276,7 +332,9 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
       currentY = margin + Math.min(textHeight, maxTextHeight);
     }
   } else {
-    // 中等纸张（70x100mm）和大纸张：传统的一行一个字段布局
+    // 中等纸张和大纸张：传统的一行一个字段布局
+    const lineGap = isBulkFood ? 3 : 2; // 散装食品增加行间距
+    
     for (const field of fields) {
       if (labelData[field.key]) {
         const text = `${field.label}：${labelData[field.key]}`;
@@ -290,12 +348,12 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
           width: contentWidth,
           align: 'left'
         });
-        currentY += lines + 2;
+        currentY += lines + lineGap;
       }
     }
     
-    // 显示额外字段
-    if (labelData.extraFields && labelData.extraFields.length > 0) {
+    // 显示额外字段（仅预包装食品）
+    if (!isBulkFood && labelData.extraFields && labelData.extraFields.length > 0) {
       for (const field of labelData.extraFields) {
         if (field.label && field.value) {
           const text = `${field.label}：${field.value}`;
@@ -315,8 +373,8 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
     }
   }
   
-  // 营养成分表图片处理
-  if (labelData.nutritionImage) {
+  // 营养成分表图片处理（仅预包装食品）
+  if (!isBulkFood && labelData.nutritionImage) {
     try {
       let imageY, imageHeight;
       
@@ -336,7 +394,7 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
       } else if (isMediumPaper) {
         // 70x100mm：营养成分表压缩到1/4
         const totalUsableHeight = height - (margin * 2);
-        imageHeight = totalUsableHeight * 0.2; // 1/5高度
+        imageHeight = totalUsableHeight * 0.3;
         imageY = height - margin - imageHeight;
         
         if (imageHeight > 10) {
@@ -347,7 +405,7 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
           });
         }
       } else {
-        // 大纸张：在文字下方显示，保持宽高比
+        // 大纸张：在文字下方显示
         const remainingHeight = height - margin - currentY;
         imageY = currentY + 5;
         imageHeight = Math.min(remainingHeight - 5, contentWidth * 0.8);
