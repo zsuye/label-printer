@@ -816,7 +816,7 @@ function generatePreviewHTML(labelData, settings) {
     html = `<div style="font-size:${fontSize};line-height:${isBulkFood ? '1.6' : '1.5'};">`;
 
     // 角标
-    if (!isBulkFood && labelData.cornerTag) {
+    if (labelData.cornerTag) {
         const tagFontSize = '8px';
         html += `
             <div style="

@@ -253,8 +253,8 @@ ipcMain.handle('generate-pdf', async (event, labelData, settings) => {
   
   doc.fontSize(baseFontSize);
 
-  // 角标处理（仅预包装食品）
-  if (!isBulkFood && labelData.cornerTag) {
+  // 角标处理
+  if (labelData.cornerTag) {
     const tagText = labelData.cornerTag;
     const tagFontSize = 8;
     const tagPadding = 2;
