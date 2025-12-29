@@ -519,3 +519,8 @@ body {
         line-height: 1.5 !important;
     }
 }
+
+.auto-saving {
+    border-color: #28a745 !important;
+    transition: border-color 0.3s ease;
+}

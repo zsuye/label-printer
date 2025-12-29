@@ -4,17 +4,45 @@ let currentLabel = null;
 let inputHistory = {};
 let currentPdfPath = null;
 
+// 防抖函数，避免频繁保存
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// 自动保存函数，带防抖
+const autoSave = debounce(async () => {
+    if (currentLabel) {
+        // 添加视觉反馈
+        const inputs = document.querySelectorAll('input, textarea, select');
+        inputs.forEach(input => input.classList.add('auto-saving'));
+        
+        await saveLabel(null, false);
+        console.log('自动保存完成');
+        
+        // 移除视觉反馈
+        setTimeout(() => {
+            inputs.forEach(input => input.classList.remove('auto-saving'));
+        }, 500);
+    }
+}, 1000);
+
 // 保存标签 - 修复版
-async function saveLabel(e) {
+async function saveLabel(e, showMessage = true) {
     if (e) {
         e.preventDefault();
         e.stopPropagation();
     }
-    
     if (!currentLabel) return;
     
     try {
-        // 收集表单数据
         currentLabel.labelName = document.getElementById('labelName').value;
         currentLabel.productName = document.getElementById('productName').value;
         currentLabel.ingredients = document.getElementById('ingredients').value;
@@ -34,31 +62,25 @@ async function saveLabel(e) {
         currentLabel.tips = document.getElementById('tips').value;
         currentLabel.extraFields = getExtraFields();
         currentLabel.cornerTag = document.getElementById('cornerTag').value;
-        
-        // 【新增】保存散装食品模式和专用字段
         currentLabel.isBulkFood = document.getElementById('isBulkFood').checked;
         currentLabel.operator = document.getElementById('operator').value;
         currentLabel.operatorPhone = document.getElementById('operatorPhone').value;
-        
-        // 更新保质期和贮存条件文本
         currentLabel.shelfLife = generateShelfLifeText(currentLabel);
         currentLabel.storageCondition = generateStorageCondition(currentLabel);
         
-        // 保存到存储
         await saveLabelsToStorage();
         renderLabelList();
-        
-        // 保存输入历史
         await saveInputHistory();
         
-        // 显示成功提示
-        showSuccessMessage('标签保存成功！');
-        
+        if (showMessage) {
+            showSuccessMessage('标签保存成功！');
+        }
     } catch (error) {
         console.error('保存标签时出错:', error);
-        showSuccessMessage('保存失败：' + error.message);
+        if (showMessage) {
+            showSuccessMessage('保存失败：' + error.message);
+        }
     }
-    
     return false;
 }
 
@@ -797,7 +819,8 @@ function formatDate(date) {
 // 生成预览HTML - 改进版，支持自适应布局
 function generatePreviewHTML(labelData, settings) {
     let html = '';
-    const isSmallPaper = settings.paperSize === '70x70mm';
+    // 60x80mm与70x70mm使用相同的小纸张逻辑
+    const isSmallPaper = settings.paperSize === '70x70mm' || settings.paperSize === '60x80mm';
     const isMediumPaper = settings.paperSize === '70x100mm';
     const isCustomSmall = settings.paperSize === 'custom' &&
                          parseFloat(settings.customWidth) < 75 &&
@@ -850,7 +873,6 @@ function generatePreviewHTML(labelData, settings) {
     }
     let fields;
     if (isBulkFood) {
-        // 动态构建字段列表，根据是否有分装日期决定
         fields = [
             { key: 'productName', label: '产品名称' },
             { key: 'origin', label: '产地' },
@@ -859,13 +881,9 @@ function generatePreviewHTML(labelData, settings) {
             { key: 'productionDateBulk', label: '生产日期' },
             { key: 'shelfLife', label: '保质期' }
         ];
-        
-        // 如果有分装日期，才添加这个字段
         if (labelData.packingDate) {
             fields.push({ key: 'packingDate', label: '分装日期' });
         }
-        
-        // 添加其余字段
         fields.push(
             { key: 'storageCondition', label: '贮存条件' },
             { key: 'usage', label: '食用方法' },
@@ -963,14 +981,12 @@ function generatePreviewHTML(labelData, settings) {
 // 更新预览区域的样式以适应不同纸张
 function updatePreviewAreaStyle(settings) {
     const previewContent = document.getElementById('previewContent');
-    
-    // 判断纸张类型
-    const isSmallPaper = settings.paperSize === '70x70mm';
+    // 判断纸张类型 - 60x80mm与70x70mm使用相同的小纸张逻辑
+    const isSmallPaper = settings.paperSize === '70x70mm' || settings.paperSize === '60x80mm';
     const isMediumPaper = settings.paperSize === '70x100mm';
-    const isCustomSmall = settings.paperSize === 'custom' && 
-                         parseFloat(settings.customWidth) < 75 && 
+    const isCustomSmall = settings.paperSize === 'custom' &&
+                         parseFloat(settings.customWidth) < 75 &&
                          parseFloat(settings.customHeight) < 75;
-    
     if (isSmallPaper || isCustomSmall) {
         // 小纸张预览样式
         previewContent.style.minHeight = '300px';
@@ -991,7 +1007,6 @@ function updatePreviewAreaStyle(settings) {
         previewContent.className = 'preview-content';
     }
 }
-
 // 预览标签 - 更新版
 async function previewLabel() {
     if (!currentLabel) {
@@ -1174,43 +1189,45 @@ let isMouseOverSuggestions = false;
 
 // 输入记忆功能
 function setupInputMemory() {
-    const inputs = document.querySelectorAll('input[type="text"], textarea');
+    const inputs = document.querySelectorAll('input[type="text"], textarea, select');
     
     inputs.forEach(input => {
-        // 获取输入历史
         input.addEventListener('focus', (e) => {
             showSuggestions(e.target);
         });
         
-        // 更新输入历史 - 修改blur事件处理，增加延迟时间
         input.addEventListener('blur', (e) => {
-            // 延迟执行，给点击建议项留出更多时间
+            // 更新输入历史
+            updateInputHistory(e.target.id, e.target.value);
+            
+            // 自动保存
+            if (currentLabel) {
+                autoSave();
+            }
+            
+            // 处理建议列表
             hideTimeout = setTimeout(() => {
-                // 如果鼠标不在建议列表上，才隐藏
                 if (!isMouseOverSuggestions) {
-                    updateInputHistory(e.target.id, e.target.value);
                     hideSuggestions();
                 }
-            }, 800); // 增加到800ms
+            }, 800);
         });
         
-        // 键盘导航
         input.addEventListener('keydown', (e) => {
             handleSuggestionNavigation(e);
         });
         
-        // 添加input事件监听，实时更新建议
         input.addEventListener('input', (e) => {
             showSuggestions(e.target);
         });
     });
     
-    // 全局点击事件，点击其他地方时隐藏建议列表
+    // 点击其他地方隐藏建议列表
     document.addEventListener('click', (e) => {
         const suggestionList = document.getElementById('suggestionList');
         const isInput = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
         const isSuggestion = e.target.classList.contains('suggestion-item');
-        const isSuggestionList = e.target.id === 'suggestionList' || 
+        const isSuggestionList = e.target.id === 'suggestionList' ||
                                 e.target.closest('#suggestionList');
         
         if (!isInput && !isSuggestion && !isSuggestionList) {
